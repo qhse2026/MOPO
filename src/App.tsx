@@ -1248,7 +1248,17 @@ export default function OrucReisMopoV5App() {
     });
   };
 
-  const drawRowCard = (row: any) => {
+  const drawRowCard = (row: {
+  family: keyof typeof FAMILY_LABELS;
+  mode: "scored" | "emergency";
+  label: string;
+  base?: number;
+  subtotal: number;
+  noGo: boolean;
+  applied: Array<{ key: keyof typeof COLUMN_LABELS; score: number }>;
+  emergencyPrompts: string[];
+  hardStopReasons: Array<keyof typeof COLUMN_LABELS>;
+}) => {
     const itemCount = row.mode === "scored" ? row.applied.length : row.emergencyPrompts.length;
     const cardHeight = 72 + Math.max(itemCount, 1) * 14 + (row.mode === "scored" && row.hardStopReasons.length ? 28 : 0);
 
@@ -1306,7 +1316,7 @@ export default function OrucReisMopoV5App() {
     } else {
       const applied =
         row.applied.length > 0
-          ? row.applied.map((item: any) => `${COLUMN_LABELS[item.key]} = +${item.score}`)
+          ? row.applied.map((item) => `${COLUMN_LABELS[item.key]} = +${item.score}`)
           : ["No additional score modifiers active."];
 
       applied.forEach((entry: string) => {
@@ -1327,7 +1337,7 @@ export default function OrucReisMopoV5App() {
         doc.setFontSize(8.5);
         setTextColor(redText);
         doc.text(
-          `HARD STOP: ${row.hardStopReasons.map((item: any) => COLUMN_LABELS[item]).join(", ")}`,
+          `HARD STOP: ${row.hardStopReasons.map((item) => COLUMN_LABELS[item]).join(", ")}`,
           left + 18,
           localY + 18
         );
