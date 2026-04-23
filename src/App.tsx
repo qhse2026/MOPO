@@ -1046,7 +1046,317 @@ export default function OrucReisMopoV5App() {
     event.target.value = "";
   };
 
-  const exportPdf = () => {
+ const exportPdf = () => {
+  const year = new Date(assessmentAt || Date.now()).getFullYear();
+  const counterKey = `mopo-doc-counter-${year}`;
+  const currentCounter = toNonNegativeNumber(window.localStorage.getItem(counterKey));
+  const nextCounter = currentCounter + 1;
+  const documentNo = `OR-MOPO-${year}-${String(nextCounter).padStart(3, "0")}`;
+
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const left = 40;
+  const right = pageWidth - 40;
+  const contentWidth = right - left;
+  let y = 40;
+  let pageNumber = 1;
+
+  const palette = {
+    navy: [15, 23, 42] as const,
+    slate: [71, 85, 105] as const,
+    line: [226, 232, 240] as const,
+    soft: [248, 250, 252] as const,
+    white: [255, 255, 255] as const,
+    successBg: [236, 253, 245] as const,
+    successText: [6, 95, 70] as const,
+    amberBg: [255, 251, 235] as const,
+    amberText: [180, 83, 9] as const,
+    orangeBg: [255, 247, 237] as const,
+    orangeText: [194, 65, 12] as const,
+    redBg: [254, 242, 242] as const,
+    redText: [185, 28, 28] as const,
+  };
+
+  const getRiskColors = () => {
+    if (action.icon === "green") return { bg: palette.successBg, text: palette.successText };
+    if (action.icon === "amber") return { bg: palette.amberBg, text: palette.amberText };
+    if (action.icon === "orange") return { bg: palette.orangeBg, text: palette.orangeText };
+    return { bg: palette.redBg, text: palette.redText };
+  };
+
+  const setText = (rgb: readonly number[]) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
+  const setFill = (rgb: readonly number[]) => doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+  const setDraw = (rgb: readonly number[]) => doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
+
+  const footer = () => {
+    setDraw(palette.line);
+    doc.setLineWidth(1);
+    doc.line(left, pageHeight - 34, right, pageHeight - 34);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    setText(palette.slate);
+    doc.text("TP-OTC / RV Oruç Reis - Controlled PDF Export", left, pageHeight - 18);
+    doc.text(`Page ${pageNumber}`, right, pageHeight - 18, { align: "right" });
+  };
+
+  const header = () => {
+    setFill(palette.navy);
+    doc.roundedRect(left, 28, contentWidth, 86, 16, 16, "F");
+
+    setFill([255, 255, 255]);
+    doc.roundedRect(left + 16, 44, 54, 54, 12, 12, "F");
+    setText(palette.navy);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("TP", left + 43, 67, { align: "center" });
+    doc.text("OTC", left + 43, 84, { align: "center" });
+
+    setText(palette.white);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("TP-OTC / RV ORUÇ REIS", left + 86, 61);
+    doc.setFontSize(11);
+    doc.text("ORUÇ REIS MOPO ASSESSMENT RECORD", left + 86, 81);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`Document No: ${documentNo}`, right - 18, 54, { align: "right" });
+    doc.text(`Assessment: ${assessmentAt.replace("T", " ")}`, right - 18, 70, { align: "right" });
+    doc.text(`Next Reassessment: ${nextReassessmentAt}`, right - 18, 86, { align: "right" });
+
+    y = 132;
+  };
+
+  const addPage = () => {
+    footer();
+    doc.addPage();
+    pageNumber += 1;
+    y = 40;
+    header();
+  };
+
+  const ensureSpace = (needed: number) => {
+    if (y + needed > pageHeight - 60) addPage();
+  };
+
+  const drawSectionTitle = (title: string, subtitle?: string) => {
+    ensureSpace(52);
+    setFill(palette.soft);
+    doc.roundedRect(left, y, contentWidth, subtitle ? 42 : 30, 10, 10, "F");
+    setText(palette.navy);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text(title, left + 14, y + 19);
+    if (subtitle) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      setText(palette.slate);
+      doc.text(subtitle, left + 14, y + 33);
+    }
+    y += subtitle ? 54 : 40;
+  };
+
+  const drawKeyValueGrid = (items: Array<{ label: string; value: string }>, columns = 2) => {
+    const gap = 10;
+    const boxWidth = (contentWidth - gap * (columns - 1)) / columns;
+    const rowHeight = 52;
+    for (let i = 0; i < items.length; i += columns) {
+      ensureSpace(rowHeight + 8);
+      const rowItems = items.slice(i, i + columns);
+      rowItems.forEach((item, idx) => {
+        const x = left + idx * (boxWidth + gap);
+        setFill(palette.white);
+        setDraw(palette.line);
+        doc.setLineWidth(1);
+        doc.roundedRect(x, y, boxWidth, rowHeight, 12, 12, "FD");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        setText(palette.slate);
+        doc.text(item.label.toUpperCase(), x + 12, y + 16);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10.5);
+        setText(palette.navy);
+        const valueLines = doc.splitTextToSize(item.value || "-", boxWidth - 24);
+        doc.text(valueLines, x + 12, y + 34);
+      });
+      y += rowHeight + 10;
+    }
+  };
+
+  const drawRiskBanner = () => {
+    const risk = getRiskColors();
+    ensureSpace(78);
+    setFill(risk.bg);
+    setDraw(risk.text);
+    doc.roundedRect(left, y, contentWidth, 64, 14, 14, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    setText(risk.text);
+    doc.text("FINAL DECISION STATUS", left + 16, y + 19);
+    doc.setFontSize(24);
+    doc.text(String(evaluation.total), left + 16, y + 49);
+    doc.setFontSize(12);
+    doc.text(action.title, left + 88, y + 25);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    const detailLines = doc.splitTextToSize(action.detail, contentWidth - 120);
+    doc.text(detailLines, left + 88, y + 41);
+    y += 78;
+  };
+
+  const drawBulletList = (items: string[], color: readonly number[] = palette.navy) => {
+    items.forEach((item) => {
+      const lines = doc.splitTextToSize(item, contentWidth - 24);
+      ensureSpace(lines.length * 13 + 8);
+      setText(color);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.circle(left + 5, y + 4, 1.4, "F");
+      doc.text(lines, left + 14, y + 8);
+      y += lines.length * 13 + 4;
+    });
+  };
+
+  const drawRowCard = (row: (typeof evaluation.rows)[number]) => {
+    const appliedCount = row.mode === "scored" ? row.applied.length : row.emergencyPrompts.length;
+    const estimatedHeight =
+      72 + Math.max(appliedCount, 1) * 14 + (row.mode === "scored" && row.hardStopReasons.length ? 28 : 0);
+    ensureSpace(estimatedHeight);
+
+    setFill(palette.white);
+    setDraw(palette.line);
+    doc.roundedRect(left, y, contentWidth, estimatedHeight, 14, 14, "FD");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    setText(palette.navy);
+    doc.text(row.label, left + 14, y + 20);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    setText(palette.slate);
+    doc.text(
+      `${FAMILY_LABELS[row.family]}${row.mode === "emergency" ? " | Emergency Command Mode" : ` | Base ${row.base || 0}`}`,
+      left + 14,
+      y + 35
+    );
+
+    const badgeText = row.mode === "emergency" ? "CMD" : String(row.subtotal);
+    const badgeWidth = row.mode === "emergency" ? 48 : 42;
+    const risk = row.mode === "scored" && row.noGo ? { bg: palette.redBg, text: palette.redText } : getRiskColors();
+    setFill(risk.bg);
+    setDraw(risk.bg);
+    doc.roundedRect(right - badgeWidth - 14, y + 12, badgeWidth, 24, 10, 10, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    setText(risk.text);
+    doc.text(badgeText, right - badgeWidth / 2 - 14, y + 28, { align: "center" });
+
+    let localY = y + 52;
+    if (row.mode === "emergency") {
+      const prompts = row.emergencyPrompts.length ? row.emergencyPrompts : ["No escalation prompts currently active."];
+      prompts.forEach((prompt) => {
+        const lines = doc.splitTextToSize(`Prompt: ${prompt}`, contentWidth - 32);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        setText(palette.navy);
+        doc.text(lines, left + 14, localY);
+        localY += lines.length * 13;
+      });
+    } else {
+      const applied = row.applied.length
+        ? row.applied.map((item) => `${COLUMN_LABELS[item.key]} = +${item.score}`)
+        : ["No additional score modifiers active."];
+      applied.forEach((entry) => {
+        const lines = doc.splitTextToSize(entry, contentWidth - 32);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        setText(palette.navy);
+        doc.text(lines, left + 14, localY);
+        localY += lines.length * 13;
+      });
+
+      if (row.hardStopReasons.length) {
+        setFill(palette.redBg);
+        setDraw(palette.redBg);
+        doc.roundedRect(left + 12, localY + 4, contentWidth - 24, 22, 8, 8, "FD");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        setText(palette.redText);
+        doc.text(`HARD STOP: ${row.hardStopReasons.map((item) => COLUMN_LABELS[item]).join(", ")}`, left + 18, localY + 18);
+      }
+    }
+
+    y += estimatedHeight + 10;
+  };
+
+  header();
+  drawRiskBanner();
+
+  drawSectionTitle("Assessment Details", "Primary header data for traceability, watch review and document control.");
+  drawKeyValueGrid(
+    [
+      { label: "Vessel", value: vesselName },
+      { label: "Operation Area", value: operationArea },
+      { label: "Assessment Time", value: assessmentAt.replace("T", " ") },
+      { label: "Next Reassessment", value: nextReassessmentAt },
+      { label: "Approval Status", value: approvalStatus },
+      { label: "Assessor", value: assessor || "-" },
+      { label: "Bridge Duty Officer", value: bridgeOfficer || "-" },
+      { label: "Export Number", value: documentNo },
+    ],
+    2
+  );
+
+  drawSectionTitle("Active Condition Profile", "Only the highest active environmental band is applied in each exclusive family.");
+  drawBulletList(activeColumns.length ? activeColumns.map((key) => COLUMN_LABELS[key]) : ["No additional active condition modifiers selected."]);
+
+  drawSectionTitle("Row Evaluation", "Row-by-row scoring, emergency prompts, and hard-stop visibility.");
+  if (evaluation.rows.length) {
+    evaluation.rows.forEach((row) => drawRowCard(row));
+  } else {
+    drawBulletList(["No row selected."]);
+  }
+
+  if (notes) {
+    drawSectionTitle("Operational Notes", "Bridge judgement, compensating controls, PTW references and operational remarks.");
+    const noteLines = doc.splitTextToSize(notes, contentWidth - 4);
+    ensureSpace(noteLines.length * 13 + 12);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    setText(palette.navy);
+    doc.text(noteLines, left, y);
+    y += noteLines.length * 13 + 8;
+  }
+
+  drawSectionTitle("Approval / Verification", "Manual sign-off block for controlled recordkeeping when required.");
+  drawKeyValueGrid(
+    [
+      { label: "Prepared By", value: assessor || "________________________" },
+      { label: "Bridge Verification", value: bridgeOfficer || "________________________" },
+      { label: "Approval Status", value: approvalStatus },
+      { label: "Date", value: assessmentAt.split("T")[0] || "________________________" },
+    ],
+    2
+  );
+
+  footer();
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    setText(palette.slate);
+    doc.text(`Page ${page} of ${totalPages}`, right, pageHeight - 18, { align: "right" });
+  }
+
+  doc.save(`${documentNo}.pdf`);
+  window.localStorage.setItem(counterKey, String(nextCounter));
+  setLastDocumentNo(documentNo);
+  setSaveMessage(`PDF exported: ${documentNo}`);
+  window.setTimeout(() => setSaveMessage(""), 2500);
+};
     const year = new Date(assessmentAt || Date.now()).getFullYear();
     const counterKey = `mopo-doc-counter-${year}`;
     const currentCounter = toNonNegativeNumber(window.localStorage.getItem(counterKey));
