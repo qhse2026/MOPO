@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { jsPDF } from "jspdf";
+import { Download, FileText, Save, Upload, Shield, AlertTriangle, CheckCircle2, Waves, ShipWheel, ClipboardList, RotateCcw, Smartphone, Building2 } from "lucide-react";
 
 type Condition = {
   key: string;
@@ -34,6 +36,8 @@ type StoredState = {
   manualAddOn?: number;
   extraBoatCount?: number;
   notes?: string;
+  operationArea?: string;
+  approvalStatus?: string;
 };
 
 const CONDITIONS: Condition[] = [
@@ -266,39 +270,49 @@ function toNonNegativeNumber(value: unknown): number {
   return parsed;
 }
 
-function getAction(total: number): { title: string; detail: string; badge: string } {
+function getAction(total: number): { title: string; detail: string; badge: string; ring: string; icon: "green" | "amber" | "orange" | "red" } {
   if (total <= 4) {
     return {
       title: "No additional action required",
       detail: "Operation may proceed within normal controls.",
-      badge: "bg-emerald-100 text-emerald-800 border-emerald-200",
+      badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      ring: "ring-emerald-200",
+      icon: "green",
     };
   }
   if (total <= 6) {
     return {
       title: "Conduct Risk Assessment",
       detail: "Additional risk assessment shall be carried out and controls implemented to ensure ALARP.",
-      badge: "bg-amber-100 text-amber-800 border-amber-200",
+      badge: "bg-amber-50 text-amber-700 border-amber-200",
+      ring: "ring-amber-200",
+      icon: "amber",
     };
   }
   if (total <= 8) {
     return {
       title: "Review full Risk Assessment",
       detail: "Review the full risk assessment before proceeding.",
-      badge: "bg-orange-100 text-orange-800 border-orange-200",
+      badge: "bg-orange-50 text-orange-700 border-orange-200",
+      ring: "ring-orange-200",
+      icon: "orange",
     };
   }
   if (total === 9) {
     return {
       title: "Submit MOC",
       detail: "Extended toolbox shall always take place prior to the activity.",
-      badge: "bg-rose-100 text-rose-800 border-rose-200",
+      badge: "bg-rose-50 text-rose-700 border-rose-200",
+      ring: "ring-rose-200",
+      icon: "red",
     };
   }
   return {
     title: "Prohibited combination under normal circumstances",
     detail: "Consider stopping one activity and re-evaluating, or raise an MOC request to proceed.",
-    badge: "bg-red-100 text-red-800 border-red-200",
+    badge: "bg-red-50 text-red-700 border-red-200",
+    ring: "ring-red-200",
+    icon: "red",
   };
 }
 
@@ -317,6 +331,23 @@ function getConditionScoreForFirstRow(conditionKey: string, rows: ActivityRow[])
   if (!rows.length) return null;
   const value = rows[0].scores[conditionKey];
   return typeof value === "number" || value === null ? value : null;
+}
+
+function RiskIcon({ level }: { level: "green" | "amber" | "orange" | "red" }) {
+  if (level === "green") return <CheckCircle2 className="h-5 w-5" />;
+  return <AlertTriangle className="h-5 w-5" />;
+}
+
+function SectionTitle({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle?: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="rounded-2xl bg-slate-100 p-2 text-slate-700">{icon}</div>
+      <div>
+        <h2 className="text-lg font-semibold text-slate-900 md:text-xl">{title}</h2>
+        {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
+      </div>
+    </div>
+  );
 }
 
 function ConditionCard({
@@ -342,18 +373,20 @@ function ConditionCard({
       onClick={() => {
         if (interactive) onToggle(!checked);
       }}
-      className={`w-full rounded-2xl border p-3 text-left transition ${
-        checked ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-900 hover:border-slate-400"
+      className={`w-full rounded-2xl border p-4 text-left transition-all ${
+        checked
+          ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+          : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:shadow-sm"
       } ${interactive ? "" : "cursor-not-allowed opacity-50"}`}
       aria-pressed={checked}
       disabled={!interactive}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-sm font-medium">{label}</div>
-          <div className={`mt-1 text-xs ${checked ? "text-slate-300" : "text-slate-500"}`}>{helper}</div>
+          <div className="text-sm font-semibold md:text-[15px]">{label}</div>
+          <div className={`mt-1 text-xs leading-5 ${checked ? "text-slate-300" : "text-slate-500"}`}>{helper}</div>
         </div>
-        <div className={`rounded-xl px-2 py-1 text-xs font-semibold ${checked ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}>
+        <div className={`shrink-0 rounded-xl px-2.5 py-1 text-xs font-semibold ${checked ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}>
           {scoreLabel(score)}
         </div>
       </div>
@@ -374,7 +407,7 @@ function ActivityScoreCard({
   const extraBoatPenalty = activity.id === "frb_wb_water_taxi_underway" ? toNonNegativeNumber(extraBoatCount) : 0;
 
   return (
-    <div className="rounded-2xl border bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-slate-900">{activity.label}</div>
@@ -383,12 +416,8 @@ function ActivityScoreCard({
         </div>
         <div className="rounded-2xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-900">{activity.subtotal}</div>
       </div>
-      {extraBoatPenalty > 0 ? (
-        <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">Additional deployed boats add +{extraBoatPenalty} to this activity.</div>
-      ) : null}
-      {activeConditions.length ? (
-        <div className="mt-3 text-xs text-slate-500">Applied conditions: {activeConditions.join(", ")}</div>
-      ) : null}
+      {extraBoatPenalty > 0 ? <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">Additional deployed boats add +{extraBoatPenalty} to this activity.</div> : null}
+      {activeConditions.length ? <div className="mt-3 text-xs leading-5 text-slate-500">Applied conditions: {activeConditions.join(", ")}</div> : null}
     </div>
   );
 }
@@ -398,14 +427,18 @@ export default function MopoMatrixStarterSite() {
   const [checks, setChecks] = useState<Checks>(emptyChecks);
   const [assessmentAt, setAssessmentAt] = useState<string>(formatDateTimeLocal());
   const [vesselName, setVesselName] = useState<string>("RV Oruç Reis");
+  const [operationArea, setOperationArea] = useState<string>("Offshore Seismic Operations");
   const [assessor, setAssessor] = useState<string>("");
   const [bridgeOfficer, setBridgeOfficer] = useState<string>("");
+  const [approvalStatus, setApprovalStatus] = useState<string>("Draft Assessment");
   const [manualAddOn, setManualAddOn] = useState<number>(0);
   const [extraBoatCount, setExtraBoatCount] = useState<number>(0);
   const [notes, setNotes] = useState<string>("");
+  const [saveMessage, setSaveMessage] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem("mopo-site-v2");
+    const raw = window.localStorage.getItem("mopo-site-v3");
     if (!raw) return;
 
     try {
@@ -414,8 +447,10 @@ export default function MopoMatrixStarterSite() {
       setChecks({ ...emptyChecks, ...(parsed.checks ?? {}) });
       setAssessmentAt(typeof parsed.assessmentAt === "string" && parsed.assessmentAt ? parsed.assessmentAt : formatDateTimeLocal());
       setVesselName(typeof parsed.vesselName === "string" && parsed.vesselName ? parsed.vesselName : "RV Oruç Reis");
+      setOperationArea(typeof parsed.operationArea === "string" && parsed.operationArea ? parsed.operationArea : "Offshore Seismic Operations");
       setAssessor(typeof parsed.assessor === "string" ? parsed.assessor : "");
       setBridgeOfficer(typeof parsed.bridgeOfficer === "string" ? parsed.bridgeOfficer : "");
+      setApprovalStatus(typeof parsed.approvalStatus === "string" && parsed.approvalStatus ? parsed.approvalStatus : "Draft Assessment");
       setManualAddOn(toNonNegativeNumber(parsed.manualAddOn));
       setExtraBoatCount(toNonNegativeNumber(parsed.extraBoatCount));
       setNotes(typeof parsed.notes === "string" ? parsed.notes : "");
@@ -424,8 +459,10 @@ export default function MopoMatrixStarterSite() {
       setChecks(emptyChecks);
       setAssessmentAt(formatDateTimeLocal());
       setVesselName("RV Oruç Reis");
+      setOperationArea("Offshore Seismic Operations");
       setAssessor("");
       setBridgeOfficer("");
+      setApprovalStatus("Draft Assessment");
       setManualAddOn(0);
       setExtraBoatCount(0);
       setNotes("");
@@ -438,18 +475,18 @@ export default function MopoMatrixStarterSite() {
       checks,
       assessmentAt,
       vesselName,
+      operationArea,
       assessor,
       bridgeOfficer,
+      approvalStatus,
       manualAddOn,
       extraBoatCount,
       notes,
     };
-    window.localStorage.setItem("mopo-site-v2", JSON.stringify(payload));
-  }, [selectedActivities, checks, assessmentAt, vesselName, assessor, bridgeOfficer, manualAddOn, extraBoatCount, notes]);
+    window.localStorage.setItem("mopo-site-v3", JSON.stringify(payload));
+  }, [selectedActivities, checks, assessmentAt, vesselName, operationArea, assessor, bridgeOfficer, approvalStatus, manualAddOn, extraBoatCount, notes]);
 
-  const activeRows = useMemo(() => {
-    return ACTIVITY_ROWS.filter((row) => selectedActivities.includes(row.id));
-  }, [selectedActivities]);
+  const activeRows = useMemo(() => ACTIVITY_ROWS.filter((row) => selectedActivities.includes(row.id)), [selectedActivities]);
 
   const perActivity = useMemo(() => {
     return activeRows.map((activity) => {
@@ -473,14 +510,15 @@ export default function MopoMatrixStarterSite() {
   const totalScore = perActivity.reduce((sum, item) => sum + item.subtotal, 0) + safeManualAddOn;
   const action = getAction(totalScore);
   const nextReassessmentAt = addHours(assessmentAt, 4);
-
   const selectedConditionLabels = CONDITIONS.filter((condition) => isConditionActive(condition, checks)).map((condition) => condition.label);
 
   const summaryLines = [
     "MOPO ASSESSMENT SUMMARY",
     `Vessel: ${vesselName}`,
+    `Operation Area: ${operationArea}`,
     `Assessment time: ${assessmentAt}`,
     `Next reassessment due: ${nextReassessmentAt}`,
+    `Approval Status: ${approvalStatus}`,
     assessor ? `Assessor: ${assessor}` : null,
     bridgeOfficer ? `Bridge Duty Officer: ${bridgeOfficer}` : null,
     "",
@@ -503,9 +541,7 @@ export default function MopoMatrixStarterSite() {
 
   const toggleActivity = (id: string) => {
     setSelectedActivities((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((item) => item !== id);
-      }
+      if (prev.includes(id)) return prev.filter((item) => item !== id);
       return [...prev, id];
     });
   };
@@ -513,9 +549,11 @@ export default function MopoMatrixStarterSite() {
   const copySummary = async () => {
     try {
       await navigator.clipboard.writeText(summaryText);
-      alert("Assessment summary copied.");
+      setSaveMessage("Assessment summary copied.");
+      window.setTimeout(() => setSaveMessage(""), 2500);
     } catch {
-      alert("Clipboard copy failed. Please copy manually.");
+      setSaveMessage("Clipboard copy failed.");
+      window.setTimeout(() => setSaveMessage(""), 2500);
     }
   };
 
@@ -523,69 +561,266 @@ export default function MopoMatrixStarterSite() {
     setSelectedActivities(["streamer_deploy_recovery"]);
     setChecks(emptyChecks);
     setAssessmentAt(formatDateTimeLocal());
+    setVesselName("RV Oruç Reis");
+    setOperationArea("Offshore Seismic Operations");
     setAssessor("");
     setBridgeOfficer("");
+    setApprovalStatus("Draft Assessment");
     setManualAddOn(0);
     setExtraBoatCount(0);
     setNotes("");
+    setSaveMessage("Assessment reset.");
+    window.setTimeout(() => setSaveMessage(""), 2500);
+  };
+
+  const saveSnapshot = () => {
+    const payload: StoredState = {
+      selectedActivities,
+      checks,
+      assessmentAt,
+      vesselName,
+      operationArea,
+      assessor,
+      bridgeOfficer,
+      approvalStatus,
+      manualAddOn,
+      extraBoatCount,
+      notes,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mopo-save-${assessmentAt.replace(/[:T]/g, "-")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setSaveMessage("Save file downloaded.");
+    window.setTimeout(() => setSaveMessage(""), 2500);
+  };
+
+  const loadSnapshot = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result)) as StoredState;
+        setSelectedActivities(Array.isArray(parsed.selectedActivities) && parsed.selectedActivities.length ? parsed.selectedActivities : ["streamer_deploy_recovery"]);
+        setChecks({ ...emptyChecks, ...(parsed.checks ?? {}) });
+        setAssessmentAt(typeof parsed.assessmentAt === "string" && parsed.assessmentAt ? parsed.assessmentAt : formatDateTimeLocal());
+        setVesselName(typeof parsed.vesselName === "string" && parsed.vesselName ? parsed.vesselName : "RV Oruç Reis");
+        setOperationArea(typeof parsed.operationArea === "string" && parsed.operationArea ? parsed.operationArea : "Offshore Seismic Operations");
+        setAssessor(typeof parsed.assessor === "string" ? parsed.assessor : "");
+        setBridgeOfficer(typeof parsed.bridgeOfficer === "string" ? parsed.bridgeOfficer : "");
+        setApprovalStatus(typeof parsed.approvalStatus === "string" && parsed.approvalStatus ? parsed.approvalStatus : "Draft Assessment");
+        setManualAddOn(toNonNegativeNumber(parsed.manualAddOn));
+        setExtraBoatCount(toNonNegativeNumber(parsed.extraBoatCount));
+        setNotes(typeof parsed.notes === "string" ? parsed.notes : "");
+        setSaveMessage("Save file loaded.");
+      } catch {
+        setSaveMessage("Invalid save file.");
+      }
+      window.setTimeout(() => setSaveMessage(""), 2500);
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  };
+
+  const exportPdf = () => {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    let y = 42;
+
+    const writeLine = (text: string, size = 10, bold = false, spacing = 16) => {
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.setFontSize(size);
+      const lines = doc.splitTextToSize(text, 520);
+      doc.text(lines, 42, y);
+      y += lines.length * spacing;
+      if (y > 760) {
+        doc.addPage();
+        y = 42;
+      }
+    };
+
+    doc.setFillColor(15, 23, 42);
+    doc.roundedRect(42, 28, 511, 54, 12, 12, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("TP-OTC / RV ORUÇ REIS - MOPO ASSESSMENT", 56, 60);
+    doc.setFontSize(9);
+    doc.text("Matrix of Permitted Operations | Decision Support Record", 56, 76);
+
+    doc.setTextColor(15, 23, 42);
+    y = 110;
+    writeLine(`Vessel: ${vesselName}`, 11, true);
+    writeLine(`Operation Area: ${operationArea}`);
+    writeLine(`Assessment Time: ${assessmentAt}`);
+    writeLine(`Next Reassessment Due: ${nextReassessmentAt}`);
+    writeLine(`Approval Status: ${approvalStatus}`);
+    if (assessor) writeLine(`Assessor: ${assessor}`);
+    if (bridgeOfficer) writeLine(`Bridge Duty Officer: ${bridgeOfficer}`);
+    writeLine(`Total MOPO Risk Rating: ${totalScore}`, 12, true);
+    writeLine(`Required Action: ${action.title}`, 11, true);
+    writeLine(action.detail);
+
+    y += 8;
+    writeLine("Selected Activities", 12, true);
+    (perActivity.length ? perActivity : []).forEach((item) => writeLine(`• ${item.label} | Responsible: ${item.responsible} | Score: ${item.subtotal}`));
+
+    y += 8;
+    writeLine("Applied Conditions", 12, true);
+    (selectedConditionLabels.length ? selectedConditionLabels : ["None"]).forEach((item) => writeLine(`• ${item}`));
+
+    if (safeManualAddOn > 0) {
+      y += 8;
+      writeLine(`Manual Add-On Score: +${safeManualAddOn}`, 11, true);
+    }
+
+    if (notes) {
+      y += 8;
+      writeLine("Operational Notes", 12, true);
+      writeLine(notes);
+    }
+
+    doc.save(`mopo-assessment-${assessmentAt.replace(/[:T]/g, "-")}.pdf`);
+    setSaveMessage("PDF exported.");
+    window.setTimeout(() => setSaveMessage(""), 2500);
   };
 
   const naturalConditions = CONDITIONS.filter((item) => item.group === "natural");
   const operationalConditions = CONDITIONS.filter((item) => item.group === "operational");
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto max-w-7xl p-4 md:p-8">
-        <div className="rounded-3xl border bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="min-h-screen bg-slate-100 text-slate-900">
+      <div className="border-b border-slate-200 bg-slate-950 text-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 md:px-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="rounded-3xl bg-white/10 p-3 ring-1 ring-white/10">
+              <ShipWheel className="h-7 w-7" />
+            </div>
             <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500">MOPO V2</div>
-              <h1 className="mt-2 text-3xl font-bold tracking-tight">Matrix of Permitted Operations — decision support site</h1>
-              <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-                This version is built around the D009 logic. The MOPO is reassessed every 4 hours at watch change using the forecast for the next 4 hours. Each activity is scored individually, and the Total MOPO Risk Rating is the sum of active activities.
+              <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.25em] text-slate-300">
+                <span>TP-OTC</span>
+                <span>•</span>
+                <span>RV Oruç Reis</span>
+                <span>•</span>
+                <span>MOPO Control Panel</span>
+              </div>
+              <h1 className="mt-2 text-2xl font-bold tracking-tight md:text-3xl">Matrix of Permitted Operations</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                Corporate decision support interface for watch-based MOPO scoring, SIMOPS review, risk visibility, operational recordkeeping, PDF export, and save / load workflow.
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <button onClick={copySummary} className="rounded-2xl border px-4 py-2 text-sm font-medium hover:bg-slate-50">
-                Copy summary
-              </button>
-              <button onClick={resetAll} className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">
-                Reset
-              </button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <div className="rounded-3xl border border-white/10 bg-white/5 px-4 py-3">
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Assessment status</div>
+              <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-white">
+                <RiskIcon level={action.icon} />
+                {action.title}
+              </div>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-white/5 px-4 py-3">
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Total MOPO Risk Rating</div>
+              <div className="mt-2 text-2xl font-black text-white">{totalScore}</div>
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="mx-auto max-w-7xl px-4 py-6 md:px-8">
+        <div className="mb-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <SectionTitle icon={<Building2 className="h-5 w-5" />} title="Corporate assessment header" subtitle="Aligned with admin-style layout and watch-change decision workflow." />
+              <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold ${action.badge}`}>
+                <RiskIcon level={action.icon} />
+                {action.title}
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Vessel</label>
+                <input value={vesselName} onChange={(e) => setVesselName(e.target.value)} className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 outline-none transition focus:border-slate-400" />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Operation Area</label>
+                <input value={operationArea} onChange={(e) => setOperationArea(e.target.value)} className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 outline-none transition focus:border-slate-400" />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Assessment time</label>
+                <input type="datetime-local" value={assessmentAt} onChange={(e) => setAssessmentAt(e.target.value)} className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 outline-none transition focus:border-slate-400" />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Assessor</label>
+                <input value={assessor} onChange={(e) => setAssessor(e.target.value)} className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 outline-none transition focus:border-slate-400" />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Bridge Duty Officer</label>
+                <input value={bridgeOfficer} onChange={(e) => setBridgeOfficer(e.target.value)} className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 outline-none transition focus:border-slate-400" />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Approval Status</label>
+                <select value={approvalStatus} onChange={(e) => setApprovalStatus(e.target.value)} className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 outline-none transition focus:border-slate-400">
+                  <option>Draft Assessment</option>
+                  <option>Bridge Reviewed</option>
+                  <option>Responsible Person Reviewed</option>
+                  <option>Escalated for MOC</option>
+                  <option>Approved for Execution</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Next reassessment</div>
+                <div className="mt-2 text-sm font-semibold text-slate-900">{nextReassessmentAt || "—"}</div>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Active activities</div>
+                <div className="mt-2 text-sm font-semibold text-slate-900">{perActivity.length}</div>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Mobile-ready layout</div>
+                <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-900"><Smartphone className="h-4 w-4" /> Responsive grid enabled</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <SectionTitle icon={<Shield className="h-5 w-5" />} title="Control actions" subtitle="Export, save, load, and quick controls for field use." />
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <button onClick={copySummary} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
+                <ClipboardList className="h-4 w-4" /> Copy summary
+              </button>
+              <button onClick={exportPdf} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
+                <FileText className="h-4 w-4" /> Export PDF
+              </button>
+              <button onClick={saveSnapshot} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
+                <Save className="h-4 w-4" /> Save file
+              </button>
+              <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
+                <Upload className="h-4 w-4" /> Load file
+              </button>
+              <button onClick={resetAll} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 sm:col-span-2">
+                <RotateCcw className="h-4 w-4" /> Reset assessment
+              </button>
+            </div>
+            <input ref={fileInputRef} type="file" accept="application/json" onChange={loadSnapshot} className="hidden" />
+            <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-xs leading-6 text-slate-600">
+              <div className="font-semibold text-slate-700">Risk logic reminder</div>
+              <div className="mt-1">0–4 green, 5–6 amber, 7–8 orange, 9 rose, 10+ red / prohibited combination unless escalated.</div>
+            </div>
+            {saveMessage ? <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{saveMessage}</div> : null}
+          </div>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
           <div className="space-y-6">
-            <section className="rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Assessment header</h2>
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Vessel</label>
-                  <input value={vesselName} onChange={(e) => setVesselName(e.target.value)} className="w-full rounded-2xl border px-3 py-2 outline-none focus:border-slate-400" />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Assessment time</label>
-                  <input type="datetime-local" value={assessmentAt} onChange={(e) => setAssessmentAt(e.target.value)} className="w-full rounded-2xl border px-3 py-2 outline-none focus:border-slate-400" />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Assessor</label>
-                  <input value={assessor} onChange={(e) => setAssessor(e.target.value)} className="w-full rounded-2xl border px-3 py-2 outline-none focus:border-slate-400" />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Bridge Duty Officer</label>
-                  <input value={bridgeOfficer} onChange={(e) => setBridgeOfficer(e.target.value)} className="w-full rounded-2xl border px-3 py-2 outline-none focus:border-slate-400" />
-                </div>
-              </div>
-              <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                Next reassessment due at <span className="font-semibold">{nextReassessmentAt || "—"}</span>
-              </div>
-            </section>
-
-            <section className="rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Active activities / SIMOPS</h2>
-              <p className="mt-1 text-sm text-slate-500">Select all activities taking place during the same watch. The total score will sum them.</p>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <SectionTitle icon={<ShipWheel className="h-5 w-5" />} title="Active activities / SIMOPS" subtitle="Select all activities taking place during the same watch. The total score will sum them." />
               <div className="mt-5 grid gap-3 md:grid-cols-2">
                 {ACTIVITY_ROWS.map((activity) => {
                   const checked = selectedActivities.includes(activity.id);
@@ -594,49 +829,32 @@ export default function MopoMatrixStarterSite() {
                       key={activity.id}
                       type="button"
                       onClick={() => toggleActivity(activity.id)}
-                      className={`rounded-2xl border p-4 text-left transition ${checked ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white hover:border-slate-400"}`}
+                      className={`rounded-2xl border p-4 text-left transition-all ${checked ? "border-slate-900 bg-slate-900 text-white shadow-sm" : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"}`}
                       aria-pressed={checked}
                     >
                       <div className="text-sm font-semibold">{activity.label}</div>
                       <div className={`mt-1 text-xs ${checked ? "text-slate-300" : "text-slate-500"}`}>Responsible Person: {activity.responsible}</div>
-                      {activity.notes ? <div className={`mt-2 text-xs ${checked ? "text-slate-300" : "text-slate-600"}`}>{activity.notes}</div> : null}
+                      {activity.notes ? <div className={`mt-2 text-xs leading-5 ${checked ? "text-slate-300" : "text-slate-600"}`}>{activity.notes}</div> : null}
                     </button>
                   );
                 })}
               </div>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Additional boats deployed</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={extraBoatCount}
-                    onChange={(e) => setExtraBoatCount(toNonNegativeNumber(e.target.value))}
-                    className="w-full rounded-2xl border px-3 py-2 outline-none focus:border-slate-400"
-                  />
+                  <input type="number" min="0" value={extraBoatCount} onChange={(e) => setExtraBoatCount(toNonNegativeNumber(e.target.value))} className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 outline-none transition focus:border-slate-400" />
                   <div className="mt-1 text-xs text-slate-500">Only affects FRB / WB / Water Taxi operations underway.</div>
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Manual add-on score</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={manualAddOn}
-                    onChange={(e) => setManualAddOn(toNonNegativeNumber(e.target.value))}
-                    className="w-full rounded-2xl border px-3 py-2 outline-none focus:border-slate-400"
-                  />
-                  <div className="mt-1 text-xs text-slate-500">Use only for a temporary activity that is not yet implemented in this site.</div>
+                  <input type="number" min="0" value={manualAddOn} onChange={(e) => setManualAddOn(toNonNegativeNumber(e.target.value))} className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 outline-none transition focus:border-slate-400" />
+                  <div className="mt-1 text-xs text-slate-500">Use only for a temporary activity not yet modeled in this site.</div>
                 </div>
               </div>
             </section>
 
-            <section className="rounded-3xl border bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-semibold">Natural limitations</h2>
-                  <p className="mt-1 text-sm text-slate-500">Use the next 4-hour forecast, not the current conditions only.</p>
-                </div>
-              </div>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <SectionTitle icon={<Waves className="h-5 w-5" />} title="Natural limitations" subtitle="Use the next 4-hour forecast, not the current conditions only." />
               <div className="mt-5 grid gap-3 md:grid-cols-2">
                 {naturalConditions.map((condition) => {
                   const disabled = Boolean(condition.requires && !checks[condition.requires]);
@@ -655,8 +873,8 @@ export default function MopoMatrixStarterSite() {
               </div>
             </section>
 
-            <section className="rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Operational limitations</h2>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <SectionTitle icon={<AlertTriangle className="h-5 w-5" />} title="Operational limitations" subtitle="Operational constraints applied across the selected activity package." />
               <div className="mt-5 grid gap-3 md:grid-cols-2">
                 {operationalConditions.map((condition) => (
                   <ConditionCard
@@ -674,62 +892,56 @@ export default function MopoMatrixStarterSite() {
           </div>
 
           <div className="space-y-6">
-            <section className="rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Per-activity scoring</h2>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <SectionTitle icon={<ClipboardList className="h-5 w-5" />} title="Per-activity scoring" subtitle="Admin-style right panel for focused operational review." />
               <div className="mt-4 space-y-3">
-                {perActivity.length ? (
-                  perActivity.map((activity) => <ActivityScoreCard key={activity.id} activity={activity} checks={checks} extraBoatCount={extraBoatCount} />)
-                ) : (
-                  <div className="rounded-2xl border border-dashed p-4 text-sm text-slate-500">Select at least one active activity.</div>
-                )}
+                {perActivity.length ? perActivity.map((activity) => <ActivityScoreCard key={activity.id} activity={activity} checks={checks} extraBoatCount={extraBoatCount} />) : <div className="rounded-2xl border border-dashed p-4 text-sm text-slate-500">Select at least one active activity.</div>}
               </div>
               {safeManualAddOn > 0 ? <div className="mt-3 rounded-2xl bg-slate-100 p-3 text-sm text-slate-700">Manual add-on included: +{safeManualAddOn}</div> : null}
             </section>
 
-            <section className="rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Total MOPO Risk Rating</h2>
-              <div className="mt-5 rounded-3xl border p-5">
+            <section className={`rounded-3xl border bg-white p-5 shadow-sm ring-1 ${action.ring}`}>
+              <SectionTitle icon={<RiskIcon level={action.icon} />} title="Total MOPO Risk Rating" subtitle="Immediate operational decision indicator with color-coded status." />
+              <div className="mt-5 rounded-3xl border border-slate-200 p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-sm uppercase tracking-[0.2em] text-slate-500">Total score</div>
-                    <div className="mt-2 text-5xl font-black tracking-tight">{totalScore}</div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Total score</div>
+                    <div className="mt-2 text-5xl font-black tracking-tight text-slate-950">{totalScore}</div>
                   </div>
-                  <span className={`inline-flex rounded-full border px-4 py-2 text-sm font-semibold ${action.badge}`}>{action.title}</span>
+                  <span className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold ${action.badge}`}>
+                    <RiskIcon level={action.icon} />
+                    {action.title}
+                  </span>
                 </div>
                 <p className="mt-4 text-sm leading-6 text-slate-600">{action.detail}</p>
               </div>
               <div className="mt-4 grid gap-3 text-sm text-slate-700">
-                <div className="rounded-2xl bg-slate-50 p-4">Score 0–4: No additional action required.</div>
-                <div className="rounded-2xl bg-slate-50 p-4">Score 5–6: Conduct Risk Assessment.</div>
-                <div className="rounded-2xl bg-slate-50 p-4">Score 7–8: Review full Risk Assessment.</div>
-                <div className="rounded-2xl bg-slate-50 p-4">Score 9: Submit MOC. Extended toolbox shall always take place.</div>
-                <div className="rounded-2xl bg-slate-50 p-4">Score 10+: Prohibited combination under normal circumstances unless escalated by MOC.</div>
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">Score 0–4: No additional action required.</div>
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">Score 5–6: Conduct Risk Assessment.</div>
+                <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">Score 7–8: Review full Risk Assessment.</div>
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">Score 9: Submit MOC. Extended toolbox shall always take place.</div>
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-4">Score 10+: Prohibited combination under normal circumstances unless escalated by MOC.</div>
               </div>
             </section>
 
-            <section className="rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Reference notes</h2>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <SectionTitle icon={<FileText className="h-5 w-5" />} title="Reference notes" subtitle="Whenever a note is indicated on MOPO, it shall be referenced in scoring." />
               <div className="mt-4 space-y-3">
                 {REFERENCE_NOTES.map((note) => (
-                  <div key={note.id} className="rounded-2xl border p-3 text-sm leading-6 text-slate-700">
+                  <div key={note.id} className="rounded-2xl border border-slate-200 p-3 text-sm leading-6 text-slate-700">
                     <span className="font-semibold">Note {note.id}.</span> {note.text}
                   </div>
                 ))}
               </div>
             </section>
 
-            <section className="rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Notes</h2>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Forecast comments, Master judgment, PTW interaction, extra controls, escort logic..."
-                className="mt-4 min-h-[180px] w-full rounded-2xl border px-3 py-3 outline-none focus:border-slate-400"
-              />
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <SectionTitle icon={<ClipboardList className="h-5 w-5" />} title="Operational notes" subtitle="Field comments, Master judgment, PTW interaction, extra controls, escort logic." />
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Forecast comments, Master judgment, PTW interaction, extra controls, escort logic..." className="mt-4 min-h-[180px] w-full rounded-2xl border border-slate-200 px-3 py-3 outline-none transition focus:border-slate-400" />
             </section>
 
-            <section className="rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Assessment summary</h2>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <SectionTitle icon={<Download className="h-5 w-5" />} title="Assessment summary" subtitle="Ready for copy, export, or attachment to operational recordkeeping." />
               <pre className="mt-4 overflow-auto rounded-2xl bg-slate-950 p-4 text-xs leading-6 text-slate-100">{summaryText}</pre>
             </section>
           </div>
