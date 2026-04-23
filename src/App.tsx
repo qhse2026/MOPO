@@ -1056,68 +1056,73 @@ export default function OrucReisMopoV5App() {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+
   const left = 40;
   const right = pageWidth - 40;
-  const contentWidth = right - left;
+  const width = right - left;
+
   let y = 40;
-  let pageNumber = 1;
+  let pageNo = 1;
 
-  const palette = {
-    navy: [15, 23, 42] as const,
-    slate: [71, 85, 105] as const,
-    line: [226, 232, 240] as const,
-    soft: [248, 250, 252] as const,
-    white: [255, 255, 255] as const,
-    successBg: [236, 253, 245] as const,
-    successText: [6, 95, 70] as const,
-    amberBg: [255, 251, 235] as const,
-    amberText: [180, 83, 9] as const,
-    orangeBg: [255, 247, 237] as const,
-    orangeText: [194, 65, 12] as const,
-    redBg: [254, 242, 242] as const,
-    redText: [185, 28, 28] as const,
-  };
+  const navy = [15, 23, 42];
+  const slate = [71, 85, 105];
+  const line = [226, 232, 240];
+  const soft = [248, 250, 252];
+  const redBg = [254, 242, 242];
+  const redText = [185, 28, 28];
+  const greenBg = [236, 253, 245];
+  const greenText = [6, 95, 70];
+  const amberBg = [255, 251, 235];
+  const amberText = [180, 83, 9];
+  const orangeBg = [255, 247, 237];
+  const orangeText = [194, 65, 12];
 
-  const getRiskColors = () => {
-    if (action.icon === "green") return { bg: palette.successBg, text: palette.successText };
-    if (action.icon === "amber") return { bg: palette.amberBg, text: palette.amberText };
-    if (action.icon === "orange") return { bg: palette.orangeBg, text: palette.orangeText };
-    return { bg: palette.redBg, text: palette.redText };
-  };
+  const riskColors =
+    action.icon === "green"
+      ? { bg: greenBg, text: greenText }
+      : action.icon === "amber"
+      ? { bg: amberBg, text: amberText }
+      : action.icon === "orange"
+      ? { bg: orangeBg, text: orangeText }
+      : { bg: redBg, text: redText };
 
-  const setText = (rgb: readonly number[]) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
-  const setFill = (rgb: readonly number[]) => doc.setFillColor(rgb[0], rgb[1], rgb[2]);
-  const setDraw = (rgb: readonly number[]) => doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
+  const setTextColor = (rgb: number[]) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
+  const setFillColor = (rgb: number[]) => doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+  const setDrawColor = (rgb: number[]) => doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
 
-  const footer = () => {
-    setDraw(palette.line);
+  const drawFooter = () => {
+    setDrawColor(line);
     doc.setLineWidth(1);
     doc.line(left, pageHeight - 34, right, pageHeight - 34);
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    setText(palette.slate);
+    setTextColor(slate);
     doc.text("TP-OTC / RV Oruç Reis - Controlled PDF Export", left, pageHeight - 18);
-    doc.text(`Page ${pageNumber}`, right, pageHeight - 18, { align: "right" });
+    doc.text(`Page ${pageNo}`, right, pageHeight - 18, { align: "right" });
   };
 
-  const header = () => {
-    setFill(palette.navy);
-    doc.roundedRect(left, 28, contentWidth, 86, 16, 16, "F");
+  const drawHeader = () => {
+    setFillColor(navy);
+    doc.roundedRect(left, 28, width, 86, 16, 16, "F");
 
-    setFill([255, 255, 255]);
+    doc.setFillColor(255, 255, 255);
     doc.roundedRect(left + 16, 44, 54, 54, 12, 12, "F");
-    setText(palette.navy);
+
+    setTextColor(navy);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.text("TP", left + 43, 67, { align: "center" });
     doc.text("OTC", left + 43, 84, { align: "center" });
 
-    setText(palette.white);
+    doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
     doc.text("TP-OTC / RV ORUÇ REIS", left + 86, 61);
+
     doc.setFontSize(11);
     doc.text("ORUÇ REIS MOPO ASSESSMENT RECORD", left + 86, 81);
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.text(`Document No: ${documentNo}`, right - 18, 54, { align: "right" });
@@ -1128,113 +1133,139 @@ export default function OrucReisMopoV5App() {
   };
 
   const addPage = () => {
-    footer();
+    drawFooter();
     doc.addPage();
-    pageNumber += 1;
+    pageNo += 1;
     y = 40;
-    header();
+    drawHeader();
   };
 
   const ensureSpace = (needed: number) => {
     if (y + needed > pageHeight - 60) addPage();
   };
 
-  const drawSectionTitle = (title: string, subtitle?: string) => {
-    ensureSpace(52);
-    setFill(palette.soft);
-    doc.roundedRect(left, y, contentWidth, subtitle ? 42 : 30, 10, 10, "F");
-    setText(palette.navy);
+  const sectionTitle = (title: string, subtitle?: string) => {
+    ensureSpace(50);
+    setFillColor(soft);
+    doc.roundedRect(left, y, width, subtitle ? 42 : 30, 10, 10, "F");
+
+    setTextColor(navy);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.text(title, left + 14, y + 19);
+
     if (subtitle) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8.5);
-      setText(palette.slate);
+      setTextColor(slate);
       doc.text(subtitle, left + 14, y + 33);
     }
+
     y += subtitle ? 54 : 40;
   };
 
-  const drawKeyValueGrid = (items: Array<{ label: string; value: string }>, columns = 2) => {
+  const writeTextBlock = (text: string, fontSize = 9.5, color = navy, extraGap = 6) => {
+    const lines = doc.splitTextToSize(text || "-", width - 4);
+    ensureSpace(lines.length * 13 + extraGap);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(fontSize);
+    setTextColor(color);
+    doc.text(lines, left, y);
+    y += lines.length * 13 + extraGap;
+  };
+
+  const drawInfoGrid = (items: Array<{ label: string; value: string }>) => {
     const gap = 10;
-    const boxWidth = (contentWidth - gap * (columns - 1)) / columns;
-    const rowHeight = 52;
-    for (let i = 0; i < items.length; i += columns) {
-      ensureSpace(rowHeight + 8);
-      const rowItems = items.slice(i, i + columns);
-      rowItems.forEach((item, idx) => {
-        const x = left + idx * (boxWidth + gap);
-        setFill(palette.white);
-        setDraw(palette.line);
+    const boxWidth = (width - gap) / 2;
+    const boxHeight = 52;
+
+    for (let i = 0; i < items.length; i += 2) {
+      ensureSpace(boxHeight + 8);
+
+      const rowItems = items.slice(i, i + 2);
+      rowItems.forEach((item, index) => {
+        const x = left + index * (boxWidth + gap);
+
+        doc.setFillColor(255, 255, 255);
+        setDrawColor(line);
         doc.setLineWidth(1);
-        doc.roundedRect(x, y, boxWidth, rowHeight, 12, 12, "FD");
+        doc.roundedRect(x, y, boxWidth, boxHeight, 12, 12, "FD");
+
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
-        setText(palette.slate);
+        setTextColor(slate);
         doc.text(item.label.toUpperCase(), x + 12, y + 16);
+
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10.5);
-        setText(palette.navy);
+        setTextColor(navy);
         const valueLines = doc.splitTextToSize(item.value || "-", boxWidth - 24);
         doc.text(valueLines, x + 12, y + 34);
       });
-      y += rowHeight + 10;
+
+      y += boxHeight + 10;
     }
   };
 
   const drawRiskBanner = () => {
-    const risk = getRiskColors();
     ensureSpace(78);
-    setFill(risk.bg);
-    setDraw(risk.text);
-    doc.roundedRect(left, y, contentWidth, 64, 14, 14, "FD");
+
+    setFillColor(riskColors.bg);
+    setDrawColor(riskColors.text);
+    doc.roundedRect(left, y, width, 64, 14, 14, "FD");
+
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    setText(risk.text);
+    setTextColor(riskColors.text);
     doc.text("FINAL DECISION STATUS", left + 16, y + 19);
+
     doc.setFontSize(24);
     doc.text(String(evaluation.total), left + 16, y + 49);
+
     doc.setFontSize(12);
     doc.text(action.title, left + 88, y + 25);
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    const detailLines = doc.splitTextToSize(action.detail, contentWidth - 120);
+    const detailLines = doc.splitTextToSize(action.detail, width - 120);
     doc.text(detailLines, left + 88, y + 41);
+
     y += 78;
   };
 
-  const drawBulletList = (items: string[], color: readonly number[] = palette.navy) => {
+  const drawBulletList = (items: string[]) => {
     items.forEach((item) => {
-      const lines = doc.splitTextToSize(item, contentWidth - 24);
-      ensureSpace(lines.length * 13 + 8);
-      setText(color);
+      const lines = doc.splitTextToSize(item, width - 24);
+      ensureSpace(lines.length * 13 + 6);
+
+      setTextColor(navy);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
       doc.circle(left + 5, y + 4, 1.4, "F");
       doc.text(lines, left + 14, y + 8);
+
       y += lines.length * 13 + 4;
     });
   };
 
-  const drawRowCard = (row: (typeof evaluation.rows)[number]) => {
-    const appliedCount = row.mode === "scored" ? row.applied.length : row.emergencyPrompts.length;
-    const estimatedHeight =
-      72 + Math.max(appliedCount, 1) * 14 + (row.mode === "scored" && row.hardStopReasons.length ? 28 : 0);
-    ensureSpace(estimatedHeight);
+  const drawRowCard = (row: any) => {
+    const itemCount = row.mode === "scored" ? row.applied.length : row.emergencyPrompts.length;
+    const cardHeight = 72 + Math.max(itemCount, 1) * 14 + (row.mode === "scored" && row.hardStopReasons.length ? 28 : 0);
 
-    setFill(palette.white);
-    setDraw(palette.line);
-    doc.roundedRect(left, y, contentWidth, estimatedHeight, 14, 14, "FD");
+    ensureSpace(cardHeight);
+
+    doc.setFillColor(255, 255, 255);
+    setDrawColor(line);
+    doc.roundedRect(left, y, width, cardHeight, 14, 14, "FD");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    setText(palette.navy);
+    setTextColor(navy);
     doc.text(row.label, left + 14, y + 20);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
-    setText(palette.slate);
+    setTextColor(slate);
     doc.text(
       `${FAMILY_LABELS[row.family]}${row.mode === "emergency" ? " | Emergency Command Mode" : ` | Base ${row.base || 0}`}`,
       left + 14,
@@ -1243,75 +1274,92 @@ export default function OrucReisMopoV5App() {
 
     const badgeText = row.mode === "emergency" ? "CMD" : String(row.subtotal);
     const badgeWidth = row.mode === "emergency" ? 48 : 42;
-    const risk = row.mode === "scored" && row.noGo ? { bg: palette.redBg, text: palette.redText } : getRiskColors();
-    setFill(risk.bg);
-    setDraw(risk.bg);
+    const badgeColors =
+      row.mode === "scored" && row.noGo
+        ? { bg: redBg, text: redText }
+        : riskColors;
+
+    setFillColor(badgeColors.bg);
+    setDrawColor(badgeColors.bg);
     doc.roundedRect(right - badgeWidth - 14, y + 12, badgeWidth, 24, 10, 10, "FD");
+
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    setText(risk.text);
+    setTextColor(badgeColors.text);
     doc.text(badgeText, right - badgeWidth / 2 - 14, y + 28, { align: "center" });
 
     let localY = y + 52;
+
     if (row.mode === "emergency") {
-      const prompts = row.emergencyPrompts.length ? row.emergencyPrompts : ["No escalation prompts currently active."];
-      prompts.forEach((prompt) => {
-        const lines = doc.splitTextToSize(`Prompt: ${prompt}`, contentWidth - 32);
+      const prompts = row.emergencyPrompts.length
+        ? row.emergencyPrompts
+        : ["No escalation prompts currently active."];
+
+      prompts.forEach((prompt: string) => {
+        const lines = doc.splitTextToSize(`Prompt: ${prompt}`, width - 32);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
-        setText(palette.navy);
+        setTextColor(navy);
         doc.text(lines, left + 14, localY);
         localY += lines.length * 13;
       });
     } else {
-      const applied = row.applied.length
-        ? row.applied.map((item) => `${COLUMN_LABELS[item.key]} = +${item.score}`)
-        : ["No additional score modifiers active."];
-      applied.forEach((entry) => {
-        const lines = doc.splitTextToSize(entry, contentWidth - 32);
+      const applied =
+        row.applied.length > 0
+          ? row.applied.map((item: any) => `${COLUMN_LABELS[item.key]} = +${item.score}`)
+          : ["No additional score modifiers active."];
+
+      applied.forEach((entry: string) => {
+        const lines = doc.splitTextToSize(entry, width - 32);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
-        setText(palette.navy);
+        setTextColor(navy);
         doc.text(lines, left + 14, localY);
         localY += lines.length * 13;
       });
 
       if (row.hardStopReasons.length) {
-        setFill(palette.redBg);
-        setDraw(palette.redBg);
-        doc.roundedRect(left + 12, localY + 4, contentWidth - 24, 22, 8, 8, "FD");
+        setFillColor(redBg);
+        setDrawColor(redBg);
+        doc.roundedRect(left + 12, localY + 4, width - 24, 22, 8, 8, "FD");
+
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8.5);
-        setText(palette.redText);
-        doc.text(`HARD STOP: ${row.hardStopReasons.map((item) => COLUMN_LABELS[item]).join(", ")}`, left + 18, localY + 18);
+        setTextColor(redText);
+        doc.text(
+          `HARD STOP: ${row.hardStopReasons.map((item: any) => COLUMN_LABELS[item]).join(", ")}`,
+          left + 18,
+          localY + 18
+        );
       }
     }
 
-    y += estimatedHeight + 10;
+    y += cardHeight + 10;
   };
 
-  header();
+  drawHeader();
   drawRiskBanner();
 
-  drawSectionTitle("Assessment Details", "Primary header data for traceability, watch review and document control.");
-  drawKeyValueGrid(
-    [
-      { label: "Vessel", value: vesselName },
-      { label: "Operation Area", value: operationArea },
-      { label: "Assessment Time", value: assessmentAt.replace("T", " ") },
-      { label: "Next Reassessment", value: nextReassessmentAt },
-      { label: "Approval Status", value: approvalStatus },
-      { label: "Assessor", value: assessor || "-" },
-      { label: "Bridge Duty Officer", value: bridgeOfficer || "-" },
-      { label: "Export Number", value: documentNo },
-    ],
-    2
+  sectionTitle("Assessment Details", "Primary header data for traceability, watch review and document control.");
+  drawInfoGrid([
+    { label: "Vessel", value: vesselName },
+    { label: "Operation Area", value: operationArea },
+    { label: "Assessment Time", value: assessmentAt.replace("T", " ") },
+    { label: "Next Reassessment", value: nextReassessmentAt },
+    { label: "Approval Status", value: approvalStatus },
+    { label: "Assessor", value: assessor || "-" },
+    { label: "Bridge Duty Officer", value: bridgeOfficer || "-" },
+    { label: "Export Number", value: documentNo },
+  ]);
+
+  sectionTitle("Active Condition Profile", "Only the highest active environmental band is applied in each exclusive family.");
+  drawBulletList(
+    activeColumns.length
+      ? activeColumns.map((key) => COLUMN_LABELS[key])
+      : ["No additional active condition modifiers selected."]
   );
 
-  drawSectionTitle("Active Condition Profile", "Only the highest active environmental band is applied in each exclusive family.");
-  drawBulletList(activeColumns.length ? activeColumns.map((key) => COLUMN_LABELS[key]) : ["No additional active condition modifiers selected."]);
-
-  drawSectionTitle("Row Evaluation", "Row-by-row scoring, emergency prompts, and hard-stop visibility.");
+  sectionTitle("Row Evaluation", "Row-by-row scoring, emergency prompts, and hard-stop visibility.");
   if (evaluation.rows.length) {
     evaluation.rows.forEach((row) => drawRowCard(row));
   } else {
@@ -1319,35 +1367,26 @@ export default function OrucReisMopoV5App() {
   }
 
   if (notes) {
-    drawSectionTitle("Operational Notes", "Bridge judgement, compensating controls, PTW references and operational remarks.");
-    const noteLines = doc.splitTextToSize(notes, contentWidth - 4);
-    ensureSpace(noteLines.length * 13 + 12);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9.5);
-    setText(palette.navy);
-    doc.text(noteLines, left, y);
-    y += noteLines.length * 13 + 8;
+    sectionTitle("Operational Notes", "Bridge judgement, compensating controls, PTW references and operational remarks.");
+    writeTextBlock(notes);
   }
 
-  drawSectionTitle("Approval / Verification", "Manual sign-off block for controlled recordkeeping when required.");
-  drawKeyValueGrid(
-    [
-      { label: "Prepared By", value: assessor || "________________________" },
-      { label: "Bridge Verification", value: bridgeOfficer || "________________________" },
-      { label: "Approval Status", value: approvalStatus },
-      { label: "Date", value: assessmentAt.split("T")[0] || "________________________" },
-    ],
-    2
-  );
+  sectionTitle("Approval / Verification", "Manual sign-off block for controlled recordkeeping when required.");
+  drawInfoGrid([
+    { label: "Prepared By", value: assessor || "________________________" },
+    { label: "Bridge Verification", value: bridgeOfficer || "________________________" },
+    { label: "Approval Status", value: approvalStatus },
+    { label: "Date", value: assessmentAt.split("T")[0] || "________________________" },
+  ]);
 
-  footer();
+  drawFooter();
 
   const totalPages = doc.getNumberOfPages();
   for (let page = 1; page <= totalPages; page += 1) {
     doc.setPage(page);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    setText(palette.slate);
+    setTextColor(slate);
     doc.text(`Page ${page} of ${totalPages}`, right, pageHeight - 18, { align: "right" });
   }
 
@@ -1357,307 +1396,6 @@ export default function OrucReisMopoV5App() {
   setSaveMessage(`PDF exported: ${documentNo}`);
   window.setTimeout(() => setSaveMessage(""), 2500);
 };
-    const year = new Date(assessmentAt || Date.now()).getFullYear();
-    const counterKey = `mopo-doc-counter-${year}`;
-    const currentCounter = toNonNegativeNumber(window.localStorage.getItem(counterKey));
-    const nextCounter = currentCounter + 1;
-    const documentNo = `OR-MOPO-${year}-${String(nextCounter).padStart(3, "0")}`;
-
-    const doc = new jsPDF({ unit: "pt", format: "a4" });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const left = 40;
-    const right = pageWidth - 40;
-    const contentWidth = right - left;
-    let y = 40;
-    let pageNumber = 1;
-
-    const palette = {
-      navy: [15, 23, 42] as const,
-      slate: [71, 85, 105] as const,
-      line: [226, 232, 240] as const,
-      soft: [248, 250, 252] as const,
-      white: [255, 255, 255] as const,
-      successBg: [236, 253, 245] as const,
-      successText: [6, 95, 70] as const,
-      amberBg: [255, 251, 235] as const,
-      amberText: [180, 83, 9] as const,
-      orangeBg: [255, 247, 237] as const,
-      orangeText: [194, 65, 12] as const,
-      redBg: [254, 242, 242] as const,
-      redText: [185, 28, 28] as const,
-    };
-
-    const getRiskColors = () => {
-      if (action.icon === "green") return { bg: palette.successBg, text: palette.successText };
-      if (action.icon === "amber") return { bg: palette.amberBg, text: palette.amberText };
-      if (action.icon === "orange") return { bg: palette.orangeBg, text: palette.orangeText };
-      return { bg: palette.redBg, text: palette.redText };
-    };
-
-    const setText = (rgb: readonly number[]) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
-    const setFill = (rgb: readonly number[]) => doc.setFillColor(rgb[0], rgb[1], rgb[2]);
-    const setDraw = (rgb: readonly number[]) => doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
-
-    const footer = () => {
-      setDraw(palette.line);
-      doc.setLineWidth(1);
-      doc.line(left, pageHeight - 34, right, pageHeight - 34);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      setText(palette.slate);
-      doc.text("TP-OTC / RV Oruç Reis - Controlled PDF Export", left, pageHeight - 18);
-      doc.text(`Page ${pageNumber}`, right, pageHeight - 18, { align: "right" });
-    };
-
-    const header = () => {
-      setFill(palette.navy);
-      doc.roundedRect(left, 28, contentWidth, 86, 16, 16, "F");
-
-      setFill([255, 255, 255]);
-      doc.roundedRect(left + 16, 44, 54, 54, 12, 12, "F");
-      setText(palette.navy);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text("TP", left + 43, 67, { align: "center" });
-      doc.text("OTC", left + 43, 84, { align: "center" });
-
-      setText(palette.white);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.text("TP-OTC / RV ORUÇ REIS", left + 86, 61);
-      doc.setFontSize(11);
-      doc.text("ORUÇ REIS MOPO ASSESSMENT RECORD", left + 86, 81);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.text(`Document No: ${documentNo}`, right - 18, 54, { align: "right" });
-      doc.text(`Assessment: ${assessmentAt.replace("T", " ")}`, right - 18, 70, { align: "right" });
-      doc.text(`Next Reassessment: ${nextReassessmentAt}`, right - 18, 86, { align: "right" });
-
-      y = 132;
-    };
-
-    const addPage = () => {
-      footer();
-      doc.addPage();
-      pageNumber += 1;
-      y = 40;
-      header();
-    };
-
-    const ensureSpace = (needed: number) => {
-      if (y + needed > pageHeight - 60) addPage();
-    };
-
-    const drawSectionTitle = (title: string, subtitle?: string) => {
-      ensureSpace(52);
-      setFill(palette.soft);
-      doc.roundedRect(left, y, contentWidth, subtitle ? 42 : 30, 10, 10, "F");
-      setText(palette.navy);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text(title, left + 14, y + 19);
-      if (subtitle) {
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8.5);
-        setText(palette.slate);
-        doc.text(subtitle, left + 14, y + 33);
-      }
-      y += subtitle ? 54 : 40;
-    };
-
-    const drawKeyValueGrid = (items: Array<{ label: string; value: string }>, columns = 2) => {
-      const gap = 10;
-      const boxWidth = (contentWidth - gap * (columns - 1)) / columns;
-      const rowHeight = 52;
-      for (let i = 0; i < items.length; i += columns) {
-        ensureSpace(rowHeight + 8);
-        const rowItems = items.slice(i, i + columns);
-        rowItems.forEach((item, idx) => {
-          const x = left + idx * (boxWidth + gap);
-          setFill(palette.white);
-          setDraw(palette.line);
-          doc.setLineWidth(1);
-          doc.roundedRect(x, y, boxWidth, rowHeight, 12, 12, "FD");
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(8);
-          setText(palette.slate);
-          doc.text(item.label.toUpperCase(), x + 12, y + 16);
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(10.5);
-          setText(palette.navy);
-          const valueLines = doc.splitTextToSize(item.value || "-", boxWidth - 24);
-          doc.text(valueLines, x + 12, y + 34);
-        });
-        y += rowHeight + 10;
-      }
-    };
-
-    const drawRiskBanner = () => {
-      const risk = getRiskColors();
-      ensureSpace(78);
-      setFill(risk.bg);
-      setDraw(risk.text);
-      doc.roundedRect(left, y, contentWidth, 64, 14, 14, "FD");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      setText(risk.text);
-      doc.text("FINAL DECISION STATUS", left + 16, y + 19);
-      doc.setFontSize(24);
-      doc.text(String(evaluation.total), left + 16, y + 49);
-      doc.setFontSize(12);
-      doc.text(action.title, left + 88, y + 25);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      const detailLines = doc.splitTextToSize(action.detail, contentWidth - 120);
-      doc.text(detailLines, left + 88, y + 41);
-      y += 78;
-    };
-
-    const drawBulletList = (items: string[], color: readonly number[] = palette.navy) => {
-      items.forEach((item) => {
-        const lines = doc.splitTextToSize(item, contentWidth - 24);
-        ensureSpace(lines.length * 13 + 8);
-        setText(color);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9.5);
-        doc.circle(left + 5, y + 4, 1.4, "F");
-        doc.text(lines, left + 14, y + 8);
-        y += lines.length * 13 + 4;
-      });
-    };
-
-    const drawRowCard = (row: (typeof evaluation.rows)[number]) => {
-      const appliedCount = row.mode === "scored" ? row.applied.length : row.emergencyPrompts.length;
-      const estimatedHeight = 72 + Math.max(appliedCount, 1) * 14 + (row.mode === "scored" && row.hardStopReasons.length ? 28 : 0);
-      ensureSpace(estimatedHeight);
-
-      setFill(palette.white);
-      setDraw(palette.line);
-      doc.roundedRect(left, y, contentWidth, estimatedHeight, 14, 14, "FD");
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      setText(palette.navy);
-      doc.text(row.label, left + 14, y + 20);
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8.5);
-      setText(palette.slate);
-      doc.text(`${FAMILY_LABELS[row.family]}${row.mode === "emergency" ? " | Emergency Command Mode" : ` | Base ${row.base || 0}`}`, left + 14, y + 35);
-
-      const badgeText = row.mode === "emergency" ? "CMD" : String(row.subtotal);
-      const badgeWidth = row.mode === "emergency" ? 48 : 42;
-      const risk = row.mode === "scored" && row.noGo ? { bg: palette.redBg, text: palette.redText } : getRiskColors();
-      setFill(risk.bg);
-      setDraw(risk.bg);
-      doc.roundedRect(right - badgeWidth - 14, y + 12, badgeWidth, 24, 10, 10, "FD");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      setText(risk.text);
-      doc.text(badgeText, right - badgeWidth / 2 - 14, y + 28, { align: "center" });
-
-      let localY = y + 52;
-      if (row.mode === "emergency") {
-        const prompts = row.emergencyPrompts.length ? row.emergencyPrompts : ["No escalation prompts currently active."];
-        prompts.forEach((prompt) => {
-          const lines = doc.splitTextToSize(`Prompt: ${prompt}`, contentWidth - 32);
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(9);
-          setText(palette.navy);
-          doc.text(lines, left + 14, localY);
-          localY += lines.length * 13;
-        });
-      } else {
-        const applied = row.applied.length ? row.applied.map((item) => `${COLUMN_LABELS[item.key]} = +${item.score}`) : ["No additional score modifiers active."];
-        applied.forEach((entry) => {
-          const lines = doc.splitTextToSize(entry, contentWidth - 32);
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(9);
-          setText(palette.navy);
-          doc.text(lines, left + 14, localY);
-          localY += lines.length * 13;
-        });
-
-        if (row.hardStopReasons.length) {
-          setFill(palette.redBg);
-          setDraw(palette.redBg);
-          doc.roundedRect(left + 12, localY + 4, contentWidth - 24, 22, 8, 8, "FD");
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(8.5);
-          setText(palette.redText);
-          doc.text(`HARD STOP: ${row.hardStopReasons.map((item) => COLUMN_LABELS[item]).join(", ")}`, left + 18, localY + 18);
-        }
-      }
-
-      y += estimatedHeight + 10;
-    };
-
-    header();
-    drawRiskBanner();
-
-    drawSectionTitle("Assessment Details", "Primary header data for traceability, watch review and document control.");
-    drawKeyValueGrid([
-      { label: "Vessel", value: vesselName },
-      { label: "Operation Area", value: operationArea },
-      { label: "Assessment Time", value: assessmentAt.replace("T", " ") },
-      { label: "Next Reassessment", value: nextReassessmentAt },
-      { label: "Approval Status", value: approvalStatus },
-      { label: "Assessor", value: assessor || "-" },
-      { label: "Bridge Duty Officer", value: bridgeOfficer || "-" },
-      { label: "Export Number", value: documentNo },
-    ], 2);
-
-    drawSectionTitle("Active Condition Profile", "Only the highest active environmental band is applied in each exclusive family.");
-    drawBulletList(
-      activeColumns.length
-        ? activeColumns.map((key) => COLUMN_LABELS[key])
-        : ["No additional active condition modifiers selected."]
-    );
-
-    drawSectionTitle("Row Evaluation", "Row-by-row scoring, emergency prompts, and hard-stop visibility.");
-    if (evaluation.rows.length) {
-      evaluation.rows.forEach((row) => drawRowCard(row));
-    } else {
-      drawBulletList(["No row selected."]);
-    }
-
-    if (notes) {
-      drawSectionTitle("Operational Notes", "Bridge judgement, compensating controls, PTW references and operational remarks.");
-      const noteLines = doc.splitTextToSize(notes, contentWidth - 4);
-      ensureSpace(noteLines.length * 13 + 12);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9.5);
-      setText(palette.navy);
-      doc.text(noteLines, left, y);
-      y += noteLines.length * 13 + 8;
-    }
-
-    drawSectionTitle("Approval / Verification", "Manual sign-off block for controlled recordkeeping when required.");
-    drawKeyValueGrid([
-      { label: "Prepared By", value: assessor || "________________________" },
-      { label: "Bridge Verification", value: bridgeOfficer || "________________________" },
-      { label: "Approval Status", value: approvalStatus },
-      { label: "Date", value: assessmentAt.split("T")[0] || "________________________" },
-    ], 2);
-
-    footer();
-
-    const totalPages = doc.getNumberOfPages();
-    for (let page = 1; page <= totalPages; page += 1) {
-      doc.setPage(page);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      setText(palette.slate);
-      doc.text(`Page ${page} of ${totalPages}`, right, pageHeight - 18, { align: "right" });
-    }
-
-    doc.save(`${documentNo}.pdf`);
-    window.localStorage.setItem(counterKey, String(nextCounter));
-    setLastDocumentNo(documentNo);
-    setSaveMessage(`PDF exported: ${documentNo}`);
-    window.setTimeout(() => setSaveMessage(""), 2500);
-  };
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
