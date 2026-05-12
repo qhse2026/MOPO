@@ -1099,7 +1099,6 @@ export default function OrucReisMopoV5App() {
     doc.setFontSize(8);
     setTextColor(slate);
     doc.text("TP-OTC / RV Oruç Reis - Controlled PDF Export", left, pageHeight - 18);
-    doc.text(`Page ${pageNo}`, right, pageHeight - 18, { align: "right" });
   };
 
   const drawHeader = () => {
@@ -1207,31 +1206,47 @@ export default function OrucReisMopoV5App() {
     }
   };
 
-  const drawRiskBanner = () => {
-    ensureSpace(78);
+ const drawRiskBanner = () => {
+  const bannerHeight = 92;
+  ensureSpace(bannerHeight + 12);
 
-    setFillColor(riskColors.bg);
-    setDrawColor(riskColors.text);
-    doc.roundedRect(left, y, width, 64, 14, 14, "FD");
+  setFillColor(riskColors.bg);
+  setDrawColor(riskColors.text);
+  doc.roundedRect(left, y, width, bannerHeight, 14, 14, "FD");
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    setTextColor(riskColors.text);
-    doc.text("FINAL DECISION STATUS", left + 16, y + 19);
+  const scoreBoxWidth = 88;
+  const dividerX = left + scoreBoxWidth + 4;
+  const textX = left + scoreBoxWidth + 22;
+  const textWidth = width - scoreBoxWidth - 38;
 
-    doc.setFontSize(24);
-    doc.text(String(evaluation.total), left + 16, y + 49);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  setTextColor(riskColors.text);
+  doc.text("FINAL DECISION", left + 16, y + 22);
+  doc.text("STATUS", left + 16, y + 36);
 
-    doc.setFontSize(12);
-    doc.text(action.title, left + 88, y + 25);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(30);
+  doc.text(String(evaluation.total), left + 16, y + 72);
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    const detailLines = doc.splitTextToSize(action.detail, width - 120);
-    doc.text(detailLines, left + 88, y + 41);
+  setDrawColor(riskColors.text);
+  doc.setLineWidth(0.6);
+  doc.line(dividerX, y + 18, dividerX, y + bannerHeight - 18);
 
-    y += 78;
-  };
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  setTextColor(riskColors.text);
+  const titleLines = doc.splitTextToSize(action.title, textWidth);
+  doc.text(titleLines, textX, y + 30);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  const detailStartY = y + 30 + titleLines.length * 14;
+  const detailLines = doc.splitTextToSize(action.detail, textWidth);
+  doc.text(detailLines, textX, detailStartY);
+
+  y += bannerHeight + 14;
+};
 
   const drawBulletList = (items: string[]) => {
     items.forEach((item) => {
