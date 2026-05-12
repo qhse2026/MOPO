@@ -19,6 +19,7 @@ import {
 
 type Family = "core" | "wb" | "frb" | "transfer";
 type RowMode = "scored" | "emergency";
+type WbPhase = "none" | "launch" | "inSea" | "recovery";
 type ColumnKey =
   | "windGt16"
   | "windGt20"
@@ -62,6 +63,7 @@ type BarrierRequirementsState = Record<string, Partial<Record<BarrierRequirement
 
 type StoredState = {
   selectedRows?: string[];
+  wbPhase?: WbPhase;
   barrierRequirements?: BarrierRequirementsState;
   assessmentAt?: string;
   vesselName?: string;
@@ -496,6 +498,9 @@ const ROWS: RowConfig[] = [
   }, ["commsLost", "windGt27", "waveGt3_0", "visibilityLt1", "electricalStorm", "boatMechanicalConcern"]),
 ];
 
+const WB_LAUNCH_ROW_ID = "wb_launch";
+const WB_RECOVERY_ROW_ID = "wb_recovery";
+
 function pad(value: number): string {
   return String(value).padStart(2, "0");
 }
@@ -656,6 +661,7 @@ function getBarrierToggleLabel(key: BarrierRequirementKey): string {
 
 export default function OrucReisMopoV5App() {
   const [selectedRows, setSelectedRows] = useState<string[]>(["streamer_deploy_recovery"]);
+  const [wbPhase, setWbPhase] = useState<WbPhase>("none");
   const [barrierRequirements, setBarrierRequirements] = useState<BarrierRequirementsState>(buildDefaultBarrierRequirements());
   const [assessmentAt, setAssessmentAt] = useState<string>(formatDateTimeLocal());
   const [vesselName, setVesselName] = useState<string>("RV Oruç Reis");
@@ -690,6 +696,7 @@ export default function OrucReisMopoV5App() {
     try {
       const parsed = JSON.parse(raw) as StoredState;
       setSelectedRows(Array.isArray(parsed.selectedRows) && parsed.selectedRows.length ? parsed.selectedRows : ["streamer_deploy_recovery"]);
+      setWbPhase(parsed.wbPhase || "none");
       setBarrierRequirements(parsed.barrierRequirements ?? buildDefaultBarrierRequirements());
       setAssessmentAt(parsed.assessmentAt || formatDateTimeLocal());
       setVesselName(parsed.vesselName || "RV Oruç Reis");
@@ -723,6 +730,7 @@ export default function OrucReisMopoV5App() {
   useEffect(() => {
     const payload: StoredState = {
       selectedRows,
+      wbPhase,
       barrierRequirements,
       assessmentAt,
       vesselName,
@@ -752,6 +760,7 @@ export default function OrucReisMopoV5App() {
     window.localStorage.setItem("mopo-site-v5", JSON.stringify(payload));
   }, [
     selectedRows,
+    wbPhase,
     barrierRequirements,
     assessmentAt,
     vesselName,
@@ -819,7 +828,26 @@ export default function OrucReisMopoV5App() {
     ]
   );
 
-  const selectedRowObjects = useMemo(() => ROWS.filter((row) => selectedRows.includes(row.id)), [selectedRows]);
+  const effectiveSelectedRows = useMemo(() => {
+  const withoutWbPhaseGates = selectedRows.filter(
+    (rowId) => rowId !== WB_LAUNCH_ROW_ID && rowId !== WB_RECOVERY_ROW_ID
+  );
+
+  if (wbPhase === "launch") {
+    return [...withoutWbPhaseGates, WB_LAUNCH_ROW_ID];
+  }
+
+  if (wbPhase === "recovery") {
+    return [...withoutWbPhaseGates, WB_RECOVERY_ROW_ID];
+  }
+
+  return withoutWbPhaseGates;
+}, [selectedRows, wbPhase]);
+
+const selectedRowObjects = useMemo(
+  () => ROWS.filter((row) => effectiveSelectedRows.includes(row.id)),
+  [effectiveSelectedRows]
+);
 
   const evaluation = useMemo(() => {
     const rows = selectedRowObjects.map((row) => {
@@ -880,12 +908,13 @@ export default function OrucReisMopoV5App() {
 
   const summaryText = useMemo(() => {
     const lines: string[] = [
-      "ORUÇ REIS MOPO V5 ASSESSMENT SUMMARY",
+      "ORUÇ REIS MOPO ASSESSMENT SUMMARY",
       `Vessel: ${vesselName}`,
       `Operation Area: ${operationArea}`,
       `Assessment Time: ${assessmentAt}`,
       `Next Reassessment Due: ${nextReassessmentAt}`,
       `Approval Status: ${approvalStatus}`,
+      `WB Phase: ${wbPhase}`,
       assessor ? `Assessor: ${assessor}` : "",
       bridgeOfficer ? `Bridge Duty Officer: ${bridgeOfficer}` : "",
       `Next Document No: ${nextDocumentNo}`,
@@ -908,7 +937,7 @@ export default function OrucReisMopoV5App() {
     lines.push("", `TOTAL MOPO RISK RATING: ${evaluation.total}`, `Required Action: ${action.title}`, action.detail);
     if (notes) lines.push("", "Notes:", notes);
     return lines.filter(Boolean).join("\n");
-  }, [vesselName, operationArea, assessmentAt, nextReassessmentAt, approvalStatus, assessor, bridgeOfficer, nextDocumentNo, evaluation, action, notes]);
+  }, [vesselName, operationArea, assessmentAt, nextReassessmentAt, approvalStatus, wbPhase, assessor, bridgeOfficer, nextDocumentNo, evaluation, action, notes]);
 
   const groupedRows = useMemo(() => {
     return {
@@ -925,6 +954,7 @@ export default function OrucReisMopoV5App() {
 
   const resetAll = () => {
     setSelectedRows(["streamer_deploy_recovery"]);
+    setWbPhase("none");
     setBarrierRequirements(buildDefaultBarrierRequirements());
     setAssessmentAt(formatDateTimeLocal());
     setVesselName("RV Oruç Reis");
@@ -966,6 +996,7 @@ export default function OrucReisMopoV5App() {
   const saveSnapshot = () => {
     const payload: StoredState = {
       selectedRows,
+      wbPhase,
       barrierRequirements,
       assessmentAt,
       vesselName,
@@ -1011,6 +1042,7 @@ export default function OrucReisMopoV5App() {
       try {
         const parsed = JSON.parse(String(reader.result)) as StoredState;
         setSelectedRows(parsed.selectedRows || ["streamer_deploy_recovery"]);
+        setWbPhase(parsed.wbPhase || "none");
         setBarrierRequirements(parsed.barrierRequirements || buildDefaultBarrierRequirements());
         setAssessmentAt(parsed.assessmentAt || formatDateTimeLocal());
         setVesselName(parsed.vesselName || "RV Oruç Reis");
@@ -1371,6 +1403,7 @@ export default function OrucReisMopoV5App() {
     { label: "Operation Area", value: operationArea },
     { label: "Assessment Time", value: assessmentAt.replace("T", " ") },
     { label: "Next Reassessment", value: nextReassessmentAt },
+    { label: "WB Phase", value: wbPhase },
     { label: "Approval Status", value: approvalStatus },
     { label: "Assessor", value: assessor || "-" },
     { label: "Bridge Duty Officer", value: bridgeOfficer || "-" },
@@ -1589,6 +1622,44 @@ export default function OrucReisMopoV5App() {
           <div className="space-y-6">
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <SectionTitle icon={<Settings2 className="h-5 w-5" />} title="Active row selection" subtitle="Select one or more rows. WB, FRB, transfer and core packages can run as SIMOPS." />
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+    <div>
+      <div className="text-sm font-bold text-slate-900">
+        Workboat Phase Selection
+      </div>
+      <div className="mt-1 text-xs leading-relaxed text-slate-600">
+        WB Launch and WB Recovery are phase-gates. Select only the active WB phase.
+        Sequential WB phases shall not be automatically added as SIMOPS.
+      </div>
+    </div>
+    <span className="inline-flex w-fit rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-white">
+      WB-01
+    </span>
+  </div>
+
+  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+    {[
+      { value: "none", label: "No WB Phase" },
+      { value: "launch", label: "WB Launch" },
+      { value: "inSea", label: "WB In-Sea Task" },
+      { value: "recovery", label: "WB Recovery" },
+    ].map((item) => (
+      <button
+        key={item.value}
+        type="button"
+        onClick={() => setWbPhase(item.value as WbPhase)}
+        className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+          wbPhase === item.value
+            ? "border-slate-900 bg-slate-900 text-white"
+            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+        }`}
+      >
+        {item.label}
+      </button>
+    ))}
+  </div>
+</div>
               <div className="mt-5 space-y-5">
                 {(Object.keys(groupedRows) as Family[]).map((family) => (
                   <div key={family}>
