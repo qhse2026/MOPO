@@ -702,6 +702,26 @@ function shouldApplyBarrier(rowId: string, key: BarrierRequirementKey, requireme
 }
 
 function getBarrierToggleLabel(key: BarrierRequirementKey): string {
+  async function loadImageAsDataUrl(src: string): Promise<string> {
+  const response = await fetch(src);
+
+  if (!response.ok) {
+    throw new Error(`Image load failed: ${src}`);
+  }
+
+  const blob = await response.blob();
+
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      resolve(String(reader.result));
+    };
+
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
   if (key === "escortUnavailable") return "Escort required";
   if (key === "frbStandbyUnavailable") return "FRB standby required";
   return "WB required";
@@ -1178,7 +1198,7 @@ let tpOtcLogo = "";
 
 try {
   [orucReisLogo, tpOtcLogo] = await Promise.all([
-    loadImageAsDataUrl("/oruc-reis-badge.png"),
+    loadImageAsDataUrl("/oruc-reis-badge.PNG"),
     loadImageAsDataUrl("/tp-otc-logo.jpg"),
   ]);
 } catch {
