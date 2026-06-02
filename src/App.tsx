@@ -1484,8 +1484,22 @@ const drawRowCard = (row: {
   <div className="border-b border-slate-200 bg-slate-950 text-white">
   <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 md:px-8 lg:flex-row lg:items-center lg:justify-between">
     <div className="flex items-start gap-4">
-      <div className="rounded-3xl bg-white/10 p-3 ring-1 ring-white/10">
-        <ShipWheel className="h-7 w-7" />
+      <div className="flex items-center gap-3">
+        <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white p-2 ring-1 ring-white/20">
+          <img
+            src="/oruc-reis-badge.png"
+            alt="RV Oruç Reis"
+            className="h-full w-full object-contain"
+          />
+        </div>
+      
+        <div className="hidden h-16 w-44 items-center justify-center rounded-3xl bg-white p-3 ring-1 ring-white/20 sm:flex">
+          <img
+            src="/tp-otc-logo.jpg"
+            alt="TP-OTC"
+            className="max-h-full max-w-full object-contain"
+          />
+        </div>
       </div>
 
       <div>
@@ -1645,143 +1659,127 @@ const drawRowCard = (row: {
         <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
           <div className="space-y-6">
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <SectionTitle icon={<Settings2 className="h-5 w-5" />} title="Active row selection" subtitle="Select one or more rows. WB, FRB, transfer and core packages can run as SIMOPS." />
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-    <div>
-      <div className="text-sm font-bold text-slate-900">
-        Workboat Phase Selection
+  <SectionTitle
+    icon={<Settings2 className="h-5 w-5" />}
+    title="Active row selection"
+    subtitle="Select one or more rows. WB, FRB, transfer and core packages can run as SIMOPS."
+  />
+
+  <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+      <div>
+        <div className="text-sm font-bold text-slate-900">
+          Workboat Phase Selection
+        </div>
+        <div className="mt-1 text-xs leading-relaxed text-slate-600">
+          WB Launch and WB Recovery are phase-gates. Select only the active WB phase.
+          Sequential WB phases shall not be automatically added as SIMOPS.
+        </div>
       </div>
-      <div className="mt-1 text-xs leading-relaxed text-slate-600">
-        WB Launch and WB Recovery are phase-gates. Select only the active WB phase.
-        Sequential WB phases shall not be automatically added as SIMOPS.
-      </div>
+
+      <span className="inline-flex w-fit rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-white">
+        WB-01
+      </span>
     </div>
-    <span className="inline-flex w-fit rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-white">
-      WB-01
-    </span>
+
+    <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      {[
+        { value: "none", label: "No WB Phase" },
+        { value: "launch", label: "WB Launch" },
+        { value: "inSea", label: "WB In-Sea Task" },
+        { value: "recovery", label: "WB Recovery" },
+      ].map((item) => (
+        <button
+          key={item.value}
+          type="button"
+          onClick={() => setWbPhase(item.value as WbPhase)}
+          className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+            wbPhase === item.value
+              ? "border-slate-900 bg-slate-900 text-white"
+              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
   </div>
 
-  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-    {[
-      { value: "none", label: "No WB Phase" },
-      { value: "launch", label: "WB Launch" },
-      { value: "inSea", label: "WB In-Sea Task" },
-      { value: "recovery", label: "WB Recovery" },
-    ].map((item) => (
-      <button
-        key={item.value}
-        type="button"
-        onClick={() => setWbPhase(item.value as WbPhase)}
-        className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-          wbPhase === item.value
-            ? "border-slate-900 bg-slate-900 text-white"
-            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-        }`}
-      >
-        {item.label}
-      </button>
+  <div className="mt-5 space-y-5">
+    {(Object.keys(groupedRows) as Family[]).map((family) => (
+      <div key={family}>
+        <div className="mb-3 text-sm font-semibold text-slate-700">
+          {FAMILY_LABELS[family]}
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {groupedRows[family].map((row) => {
+            const checked = effectiveSelectedRows.includes(row.id);
+            const phaseControlled =
+              row.id === WB_LAUNCH_ROW_ID || row.id === WB_RECOVERY_ROW_ID;
+
+            return (
+              <button
+                key={row.id}
+                type="button"
+                onClick={() => toggleRow(row.id)}
+                className={`min-h-[86px] rounded-2xl border p-4 text-left transition ${
+                  phaseControlled
+                    ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                    : checked
+                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                    : "border-slate-200 bg-white text-slate-950 hover:border-slate-300 hover:shadow-sm"
+                }`}
+              >
+                <div
+                  className={`text-sm font-bold leading-snug ${
+                    phaseControlled
+                      ? "text-slate-400"
+                      : checked
+                      ? "text-white"
+                      : "text-slate-950"
+                  }`}
+                >
+                  {row.label}
+                </div>
+
+                <div
+                  className={`mt-2 text-xs leading-5 ${
+                    phaseControlled
+                      ? "text-slate-400"
+                      : checked
+                      ? "text-slate-300"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {phaseControlled
+                    ? "Controlled by WB Phase Selection"
+                    : row.mode === "emergency"
+                    ? "Emergency command mode"
+                    : `Base ${row.base || 0}`}
+                </div>
+
+                {row.description ? (
+                  <div
+                    className={`mt-2 text-xs leading-5 ${
+                      phaseControlled
+                        ? "text-slate-400"
+                        : checked
+                        ? "text-slate-300"
+                        : "text-slate-600"
+                    }`}
+                  >
+                    {row.description}
+                  </div>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     ))}
   </div>
-</div>
-              <div className="mt-5 space-y-5">
-                {(Object.keys(groupedRows) as Family[]).map((family) => (
-                  <div key={family}>
-                    <div className="mb-3 text-sm font-semibold text-slate-700">{FAMILY_LABELS[family]}</div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {groupedRows[family].map((row) => {
-                        const checked = effectiveSelectedRows.includes(row.id);
-                        const phaseControlled = row.id === WB_LAUNCH_ROW_ID || row.id === WB_RECOVERY_ROW_ID;
-                      
-                        return (
-                          <button
-                            key={row.id}
-                            type="button"
-                            onClick={() => toggleRow(row.id)}
-                            className={`min-h-[86px] rounded-2xl border p-4 text-left transition ${
-                              phaseControlled
-                                ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
-                                : checked
-                                ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                                : "border-slate-200 bg-white text-slate-950 hover:border-slate-300 hover:shadow-sm"
-                            }`}
-                          >
-                            <div
-                              className={`text-sm font-bold leading-snug ${
-                                phaseControlled
-                                  ? "text-slate-400"
-                                  : checked
-                                  ? "text-white"
-                                  : "text-slate-950"
-                              }`}
-                            >
-                              {row.label}
-                            </div>
-                      
-                            <div
-                              className={`mt-2 text-xs leading-5 ${
-                                phaseControlled
-                                  ? "text-slate-400"
-                                  : checked
-                                  ? "text-slate-300"
-                                  : "text-slate-500"
-                              }`}
-                            >
-                              {phaseControlled
-                                ? "Controlled by WB Phase Selection"
-                                : row.mode === "emergency"
-                                ? "Emergency command mode"
-                                : `Base ${row.base || 0}`}
-                            </div>
-                      
-                            {row.description ? (
-                              <div
-                                className={`mt-2 text-xs leading-5 ${
-                                  phaseControlled
-                                    ? "text-slate-400"
-                                    : checked
-                                    ? "text-slate-300"
-                                    : "text-slate-600"
-                                }`}
-                              >
-                                {row.description}
-                              </div>
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                            key={row.id}
-                            type="button"
-                            onClick={() => toggleRow(row.id)}
-                            className={`rounded-2xl border p-4 text-left transition ${
-                              phaseControlled
-                                ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
-                                : checked
-                                ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                                : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
-                            }`}
-                          >
-                            <div
-                              className={`mt-1 text-xs ${
-                                phaseControlled ? "text-slate-400" : checked ? "text-slate-300" : "text-slate-500"
-                              }`}
-                            >
-                              {phaseControlled
-                                ? "Controlled by WB Phase Selection"
-                                : row.mode === "emergency"
-                                ? "Emergency command mode"
-                                : `Base ${row.base || 0}`}
-                            </div>
-                            {row.description ? <div className={`mt-2 text-xs leading-5 ${checked ? "text-slate-300" : "text-slate-600"}`}>{row.description}</div> : null}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
+</section>
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <SectionTitle icon={<Waves className="h-5 w-5" />} title="Condition engine" subtitle="Bands are exclusive. Only the highest selected band in each family is applied." />
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
