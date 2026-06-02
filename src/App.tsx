@@ -666,7 +666,26 @@ function getBarrierToggleLabel(key: BarrierRequirementKey): string {
   if (key === "frbStandbyUnavailable") return "FRB standby required";
   return "WB required";
 }
+async function loadImageAsDataUrl(src: string): Promise<string> {
+  const response = await fetch(src);
 
+  if (!response.ok) {
+    throw new Error(`Image load failed: ${src}`);
+  }
+
+  const blob = await response.blob();
+
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      resolve(String(reader.result));
+    };
+
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
 export default function OrucReisMopoV5App() {
   const [selectedRows, setSelectedRows] = useState<string[]>(["streamer_deploy_recovery"]);
   const [wbPhase, setWbPhase] = useState<WbPhase>("none");
@@ -1101,13 +1120,24 @@ const toggleRow = (id: string) => {
     event.target.value = "";
   };
 
- const exportPdf = () => {
+ const exportPdf = async () => {
   const year = new Date(assessmentAt || Date.now()).getFullYear();
   const counterKey = `mopo-doc-counter-${year}`;
   const currentCounter = toNonNegativeNumber(window.localStorage.getItem(counterKey));
   const nextCounter = currentCounter + 1;
   const documentNo = `OR-MOPO-${year}-${String(nextCounter).padStart(3, "0")}`;
+let orucReisLogo = "";
+let tpOtcLogo = "";
 
+try {
+  [orucReisLogo, tpOtcLogo] = await Promise.all([
+    loadImageAsDataUrl("/oruc-reis-badge.png"),
+    loadImageAsDataUrl("/tp-otc-logo.jpg"),
+  ]);
+} catch {
+  orucReisLogo = "";
+  tpOtcLogo = "";
+}
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -1160,22 +1190,32 @@ const toggleRow = (id: string) => {
     setFillColor(navy);
     doc.roundedRect(left, 28, width, 86, 16, 16, "F");
 
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(left + 16, 44, 54, 54, 12, 12, "F");
+   doc.setFillColor(255, 255, 255);
+doc.roundedRect(left + 16, 44, 54, 54, 12, 12, "F");
 
-    setTextColor(navy);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("TP", left + 43, 67, { align: "center" });
-    doc.text("OTC", left + 43, 84, { align: "center" });
+if (orucReisLogo) {
+  doc.addImage(orucReisLogo, "PNG", left + 20, 48, 46, 46);
+} else {
+  setTextColor(navy);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("OR", left + 43, 67, { align: "center" });
+  doc.text("RV", left + 43, 84, { align: "center" });
+}
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("TP-OTC / RV ORUÇ REIS", left + 86, 61);
+if (tpOtcLogo) {
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(left + 82, 42, 132, 30, 8, 8, "F");
+  doc.addImage(tpOtcLogo, "JPEG", left + 88, 47, 120, 20);
+}
 
-    doc.setFontSize(11);
-    doc.text("ORUÇ REIS MOPO ASSESSMENT RECORD", left + 86, 81);
+   doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("TP-OTC / RV ORUÇ REIS", left + 86, 86);
+  
+  doc.setFontSize(10);
+  doc.text("ORUÇ REIS MOPO ASSESSMENT RECORD", left + 86, 101);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
