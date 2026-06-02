@@ -965,9 +965,15 @@ const selectedRowObjects = useMemo(
     };
   }, []);
 
-  const toggleRow = (id: string) => {
-    setSelectedRows((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
-  };
+const toggleRow = (id: string) => {
+  if (id === WB_LAUNCH_ROW_ID || id === WB_RECOVERY_ROW_ID) {
+    return;
+  }
+
+  setSelectedRows((prev) =>
+    prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+  );
+};
 
   const resetAll = () => {
     setSelectedRows(["streamer_deploy_recovery"]);
@@ -1684,16 +1690,31 @@ const selectedRowObjects = useMemo(
                     <div className="grid gap-3 md:grid-cols-2">
                       {groupedRows[family].map((row) => {
                         const checked = selectedRows.includes(row.id);
+                        const phaseControlled = row.id === WB_LAUNCH_ROW_ID || row.id === WB_RECOVERY_ROW_ID;
+                    
                         return (
                           <button
                             key={row.id}
                             type="button"
                             onClick={() => toggleRow(row.id)}
-                            className={`rounded-2xl border p-4 text-left transition ${checked ? "border-slate-900 bg-slate-900 text-white shadow-sm" : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"}`}
+                            className={`rounded-2xl border p-4 text-left transition ${
+                              phaseControlled
+                                ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                                : checked
+                                ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                                : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
+                            }`}
                           >
-                            <div className="text-sm font-semibold">{row.label}</div>
-                            <div className={`mt-1 text-xs ${checked ? "text-slate-300" : "text-slate-500"}`}>
-                              {row.mode === "emergency" ? "Emergency command mode" : `Base ${row.base || 0}`}
+                            <div
+                              className={`mt-1 text-xs ${
+                                phaseControlled ? "text-slate-400" : checked ? "text-slate-300" : "text-slate-500"
+                              }`}
+                            >
+                              {phaseControlled
+                                ? "Controlled by WB Phase Selection"
+                                : row.mode === "emergency"
+                                ? "Emergency command mode"
+                                : `Base ${row.base || 0}`}
                             </div>
                             {row.description ? <div className={`mt-2 text-xs leading-5 ${checked ? "text-slate-300" : "text-slate-600"}`}>{row.description}</div> : null}
                           </button>
