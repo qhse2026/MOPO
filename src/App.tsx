@@ -27,6 +27,7 @@ type ColumnKey =
   | "waveGt1_5"
   | "waveGt2_0"
   | "waveGt3_0"
+  | "waveGt5_0"
   | "visibility1_2"
   | "visibilityLt1"
   | "recoveryBeforeDarknessNotAssured"
@@ -73,7 +74,7 @@ type StoredState = {
   approvalStatus?: string;
   notes?: string;
   windBand?: "normal" | "gt16" | "gt20" | "gt27";
-  waveBand?: "normal" | "gt1_5" | "gt2_0" | "gt3_0";
+  waveBand?: "normal" | "gt1_5" | "gt2_0" | "gt3_0" | "gt5_0";
   visibilityBand?: "normal" | "vis1_2" | "visLt1";
   distanceBand?: "normal" | "gt0_3" | "gt10";
   recoveryBeforeDarknessNotAssured?: boolean;
@@ -98,6 +99,7 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   waveGt1_5: "Wave >1.5 m",
   waveGt2_0: "Wave >2.0 m",
   waveGt3_0: "Wave >3.0 m",
+  waveGt5_0: "Wave >5.0 m",
   visibility1_2: "Visibility 1–2 NM",
   visibilityLt1: "Visibility <1 NM",
   recoveryBeforeDarknessNotAssured: "Recovery before darkness not assured",
@@ -123,6 +125,12 @@ const FAMILY_LABELS: Record<Family, string> = {
   frb: "FRB Annex",
   transfer: "Transfer Interface",
 };
+
+const GLOBAL_SCORE_RULES: Partial<Record<ColumnKey, number>> = {
+  waveGt5_0: 9,
+};
+
+const GLOBAL_HARD_STOPS: ColumnKey[] = ["waveGt5_0"];
 
 function makeCoreRow(id: string, label: string, base: number, rules: Partial<Record<ColumnKey, number>>, hardStops: ColumnKey[] = [], defaults: Partial<Record<BarrierRequirementKey, boolean>> = {}) {
   return { id, label, family: "core" as Family, mode: "scored" as RowMode, base, rules, hardStops, defaultBarrierRequirements: defaults };
@@ -661,6 +669,7 @@ function getActiveColumns(state: {
   if (state.waveBand === "gt1_5") keys.push("waveGt1_5");
   if (state.waveBand === "gt2_0") keys.push("waveGt2_0");
   if (state.waveBand === "gt3_0") keys.push("waveGt3_0");
+  if (state.waveBand === "gt5_0") keys.push("waveGt5_0");
   if (state.visibilityBand === "vis1_2") keys.push("visibility1_2");
   if (state.visibilityBand === "visLt1") keys.push("visibilityLt1");
   if (state.distanceBand === "gt0_3") keys.push("distanceGt0_3");
@@ -729,7 +738,7 @@ export default function OrucReisMopoV5App() {
   const [notes, setNotes] = useState<string>("");
 
   const [windBand, setWindBand] = useState<"normal" | "gt16" | "gt20" | "gt27">("normal");
-  const [waveBand, setWaveBand] = useState<"normal" | "gt1_5" | "gt2_0" | "gt3_0">("normal");
+  const [waveBand, setWaveBand] = useState<"normal" | "gt1_5" | "gt2_0" | "gt3_0" | "gt5_0">("normal");
   const [visibilityBand, setVisibilityBand] = useState<"normal" | "vis1_2" | "visLt1">("normal");
   const [distanceBand, setDistanceBand] = useState<"normal" | "gt0_3" | "gt10">("normal");
   const [recoveryBeforeDarknessNotAssured, setRecoveryBeforeDarknessNotAssured] = useState<boolean>(false);
@@ -921,6 +930,7 @@ const selectedRowObjects = useMemo(
         const prompts = activeColumns
           .filter((key) => [
             "waveGt1_5",
+             "waveGt5_0",
             "windGt20",
             "visibilityLt1",
             "electricalStorm",
@@ -946,9 +956,15 @@ const selectedRowObjects = useMemo(
         if ((key === "escortUnavailable" || key === "frbStandbyUnavailable" || key === "wbUnavailable") && !shouldApplyBarrier(row.id, key, barrierRequirements)) {
           continue;
         }
-        if (row.hardStops?.includes(key)) hardStopReasons.push(key);
-        const score = row.rules?.[key];
-        if (typeof score === "number") applied.push({ key, score });
+const rowScore = row.rules?.[key];
+const globalScore = GLOBAL_SCORE_RULES[key];
+const score = typeof rowScore === "number" ? rowScore : globalScore;
+
+const isHardStop =
+  row.hardStops?.includes(key) || GLOBAL_HARD_STOPS.includes(key);
+
+if (isHardStop) hardStopReasons.push(key);
+if (typeof score === "number") applied.push({ key, score });
       }
 
       const subtotal = (row.base || 0) + applied.reduce((sum, item) => sum + item.score, 0);
@@ -1864,12 +1880,19 @@ const drawRowCard = (row: {
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Wave</label>
-                  <select value={waveBand} onChange={(e) => setWaveBand(e.target.value as "normal" | "gt1_5" | "gt2_0" | "gt3_0")} className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 outline-none focus:border-slate-400">
-                    <option value="normal">Normal</option>
-                    <option value="gt1_5">&gt;1.5 m</option>
-                    <option value="gt2_0">&gt;2.0 m</option>
-                    <option value="gt3_0">&gt;3.0 m</option>
-                  </select>
+                  <select
+  value={waveBand}
+  onChange={(e) =>
+    setWaveBand(e.target.value as "normal" | "gt1_5" | "gt2_0" | "gt3_0" | "gt5_0")
+  }
+  className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 outline-none focus:border-slate-400"
+>
+  <option value="normal">Normal</option>
+  <option value="gt1_5">&gt;1.5 m</option>
+  <option value="gt2_0">&gt;2.0 m</option>
+  <option value="gt3_0">&gt;3.0 m</option>
+  <option value="gt5_0">&gt;5.0 m</option>
+</select>
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Visibility</label>
