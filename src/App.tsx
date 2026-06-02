@@ -1690,11 +1690,66 @@ const drawRowCard = (row: {
                     <div className="mb-3 text-sm font-semibold text-slate-700">{FAMILY_LABELS[family]}</div>
                     <div className="grid gap-3 md:grid-cols-2">
                       {groupedRows[family].map((row) => {
-                        const checked = selectedRows.includes(row.id);
+                        const checked = effectiveSelectedRows.includes(row.id);
                         const phaseControlled = row.id === WB_LAUNCH_ROW_ID || row.id === WB_RECOVERY_ROW_ID;
-                    
+                      
                         return (
                           <button
+                            key={row.id}
+                            type="button"
+                            onClick={() => toggleRow(row.id)}
+                            className={`min-h-[86px] rounded-2xl border p-4 text-left transition ${
+                              phaseControlled
+                                ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                                : checked
+                                ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                                : "border-slate-200 bg-white text-slate-950 hover:border-slate-300 hover:shadow-sm"
+                            }`}
+                          >
+                            <div
+                              className={`text-sm font-bold leading-snug ${
+                                phaseControlled
+                                  ? "text-slate-400"
+                                  : checked
+                                  ? "text-white"
+                                  : "text-slate-950"
+                              }`}
+                            >
+                              {row.label}
+                            </div>
+                      
+                            <div
+                              className={`mt-2 text-xs leading-5 ${
+                                phaseControlled
+                                  ? "text-slate-400"
+                                  : checked
+                                  ? "text-slate-300"
+                                  : "text-slate-500"
+                              }`}
+                            >
+                              {phaseControlled
+                                ? "Controlled by WB Phase Selection"
+                                : row.mode === "emergency"
+                                ? "Emergency command mode"
+                                : `Base ${row.base || 0}`}
+                            </div>
+                      
+                            {row.description ? (
+                              <div
+                                className={`mt-2 text-xs leading-5 ${
+                                  phaseControlled
+                                    ? "text-slate-400"
+                                    : checked
+                                    ? "text-slate-300"
+                                    : "text-slate-600"
+                                }`}
+                              >
+                                {row.description}
+                              </div>
+                            ) : null}
+                          </button>
+                        );
+                      })}
                             key={row.id}
                             type="button"
                             onClick={() => toggleRow(row.id)}
@@ -1836,7 +1891,7 @@ const drawRowCard = (row: {
 
           <div className="space-y-6">
             <section className={`rounded-3xl border bg-white p-5 shadow-sm ring-1 ${action.ring}`}>
-              <SectionTitle icon={<RiskIcon level={action.icon} />} title="Total MOPO Risk Rating" subtitle="Total score, no-go logic, and action band according to locked V5 rules." />
+              <SectionTitle icon={<RiskIcon level={action.icon} />} title="Total MOPO Risk Rating" subtitle="Total score, no-go logic, and action band according to controlled MOPO rules." />
               <div className="mt-5 rounded-3xl border border-slate-200 p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
