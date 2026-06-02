@@ -501,6 +501,14 @@ const ROWS: RowConfig[] = [
 const WB_LAUNCH_ROW_ID = "wb_launch";
 const WB_RECOVERY_ROW_ID = "wb_recovery";
 
+const WB_IN_SEA_ROW_IDS = [
+  "wb_visual_inspection",
+  "wb_cleaning",
+  "wb_equipment_change",
+  "wb_personnel_transfer",
+  "wb_stores_transfer",
+  "wb_emergency_assist",
+];
 function pad(value: number): string {
   return String(value).padStart(2, "0");
 }
@@ -828,20 +836,29 @@ export default function OrucReisMopoV5App() {
     ]
   );
 
-  const effectiveSelectedRows = useMemo(() => {
-  const withoutWbPhaseGates = selectedRows.filter(
-    (rowId) => rowId !== WB_LAUNCH_ROW_ID && rowId !== WB_RECOVERY_ROW_ID
+const effectiveSelectedRows = useMemo(() => {
+  const nonWbRows = selectedRows.filter((rowId) => {
+    const row = ROWS.find((item) => item.id === rowId);
+    return row?.family !== "wb";
+  });
+
+  const selectedWbInSeaRows = selectedRows.filter((rowId) =>
+    WB_IN_SEA_ROW_IDS.includes(rowId)
   );
 
+  if (wbPhase === "none") {
+    return nonWbRows;
+  }
+
   if (wbPhase === "launch") {
-    return [...withoutWbPhaseGates, WB_LAUNCH_ROW_ID];
+    return [...nonWbRows, WB_LAUNCH_ROW_ID];
   }
 
   if (wbPhase === "recovery") {
-    return [...withoutWbPhaseGates, WB_RECOVERY_ROW_ID];
+    return [...nonWbRows, WB_RECOVERY_ROW_ID];
   }
 
-  return withoutWbPhaseGates;
+  return [...nonWbRows, ...selectedWbInSeaRows];
 }, [selectedRows, wbPhase]);
 
 const selectedRowObjects = useMemo(
