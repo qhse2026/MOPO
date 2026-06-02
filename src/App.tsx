@@ -20,6 +20,7 @@ import {
 type Family = "core" | "wb" | "frb" | "transfer";
 type RowMode = "scored" | "emergency";
 type WbPhase = "none" | "launch" | "inSea" | "recovery";
+type WaveBand = "normal" | "gt1_5" | "gt2_0" | "gt3_0" | "gt5_0";
 type ColumnKey =
   | "windGt16"
   | "windGt20"
@@ -74,7 +75,7 @@ type StoredState = {
   approvalStatus?: string;
   notes?: string;
   windBand?: "normal" | "gt16" | "gt20" | "gt27";
-  waveBand?: "normal" | "gt1_5" | "gt2_0" | "gt3_0" | "gt5_0";
+  waveBand?: WaveBand;
   visibilityBand?: "normal" | "vis1_2" | "visLt1";
   distanceBand?: "normal" | "gt0_3" | "gt10";
   recoveryBeforeDarknessNotAssured?: boolean;
@@ -646,7 +647,7 @@ function buildDefaultBarrierRequirements(): BarrierRequirementsState {
 
 function getActiveColumns(state: {
   windBand: "normal" | "gt16" | "gt20" | "gt27";
-  waveBand: "normal" | "gt1_5" | "gt2_0" | "gt3_0";
+  waveBand: WaveBand;
   visibilityBand: "normal" | "vis1_2" | "visLt1";
   distanceBand: "normal" | "gt0_3" | "gt10";
   recoveryBeforeDarknessNotAssured: boolean;
@@ -738,7 +739,7 @@ export default function OrucReisMopoV5App() {
   const [notes, setNotes] = useState<string>("");
 
   const [windBand, setWindBand] = useState<"normal" | "gt16" | "gt20" | "gt27">("normal");
-  const [waveBand, setWaveBand] = useState<"normal" | "gt1_5" | "gt2_0" | "gt3_0" | "gt5_0">("normal");
+  const [waveBand, setWaveBand] = useState<WaveBand>("normal");
   const [visibilityBand, setVisibilityBand] = useState<"normal" | "vis1_2" | "visLt1">("normal");
   const [distanceBand, setDistanceBand] = useState<"normal" | "gt0_3" | "gt10">("normal");
   const [recoveryBeforeDarknessNotAssured, setRecoveryBeforeDarknessNotAssured] = useState<boolean>(false);
@@ -1883,7 +1884,7 @@ const drawRowCard = (row: {
                   <select
   value={waveBand}
   onChange={(e) =>
-    setWaveBand(e.target.value as "normal" | "gt1_5" | "gt2_0" | "gt3_0" | "gt5_0")
+    setWaveBand(e.target.value as WaveBand)
   }
   className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 outline-none focus:border-slate-400"
 >
