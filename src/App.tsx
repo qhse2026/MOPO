@@ -1318,7 +1318,7 @@ const toggleRow = (id: string) => {
     });
   };
 
-  const drawRowCard = (row: {
+const drawRowCard = (row: {
   family: keyof typeof FAMILY_LABELS;
   mode: "scored" | "emergency";
   label: string;
@@ -1329,93 +1329,94 @@ const toggleRow = (id: string) => {
   emergencyPrompts: string[];
   hardStopReasons: Array<keyof typeof COLUMN_LABELS>;
 }) => {
-    const itemCount = row.mode === "scored" ? row.applied.length : row.emergencyPrompts.length;
-    const cardHeight = 72 + Math.max(itemCount, 1) * 14 + (row.mode === "scored" && row.hardStopReasons.length ? 28 : 0);
+  const badgeText = row.mode === "emergency" ? "CMD" : String(row.subtotal);
+  const badgeWidth = row.mode === "emergency" ? 48 : 42;
+  const titleWidth = width - badgeWidth - 70;
+  const bodyWidth = width - 32;
 
-    ensureSpace(cardHeight);
+  const titleLines = doc.splitTextToSize(row.label, titleWidth);
+  const metaText =
+    row.mode === "emergency"
+      ? `${FAMILY_LABELS[row.family]} | Emergency Command Mode`
+      : `${FAMILY_LABELS[row.family]} | Base ${row.base || 0}`;
 
-    doc.setFillColor(255, 255, 255);
-    setDrawColor(line);
-    doc.roundedRect(left, y, width, cardHeight, 14, 14, "FD");
+  const bodyEntries =
+    row.mode === "emergency"
+      ? row.emergencyPrompts.length
+        ? row.emergencyPrompts.map((prompt) => `Prompt: ${prompt}`)
+        : ["No escalation prompts currently active."]
+      : row.applied.length > 0
+      ? row.applied.map((item) => `${COLUMN_LABELS[item.key]} = +${item.score}`)
+      : ["No additional score modifiers active."];
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    setTextColor(navy);
-    doc.text(row.label, left + 14, y + 20);
+  const bodyLineGroups = bodyEntries.map((entry) => doc.splitTextToSize(entry, bodyWidth));
 
+  const hardStopText = row.hardStopReasons.length
+    ? `HARD STOP: ${row.hardStopReasons.map((item) => COLUMN_LABELS[item]).join(", ")}`
+    : "";
+
+  const hardStopLines = hardStopText ? doc.splitTextToSize(hardStopText, width - 48) : [];
+
+  const headerHeight = Math.max(58, titleLines.length * 13 + 34);
+  const bodyHeight = bodyLineGroups.reduce((sum, lines) => sum + lines.length * 12 + 5, 0);
+  const hardStopHeight = hardStopLines.length ? hardStopLines.length * 11 + 20 : 0;
+  const cardHeight = headerHeight + bodyHeight + hardStopHeight + 18;
+
+  ensureSpace(cardHeight + 10);
+
+  doc.setFillColor(255, 255, 255);
+  setDrawColor(line);
+  doc.roundedRect(left, y, width, cardHeight, 14, 14, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  setTextColor(navy);
+  doc.text(titleLines, left + 14, y + 20);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  setTextColor(slate);
+  doc.text(metaText, left + 14, y + 20 + titleLines.length * 13 + 5);
+
+  const badgeColors =
+    row.mode === "scored" && row.noGo
+      ? { bg: redBg, text: redText }
+      : riskColors;
+
+  setFillColor(badgeColors.bg);
+  setDrawColor(badgeColors.bg);
+  doc.roundedRect(right - badgeWidth - 14, y + 12, badgeWidth, 24, 10, 10, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  setTextColor(badgeColors.text);
+  doc.text(badgeText, right - badgeWidth / 2 - 14, y + 28, { align: "center" });
+
+  let localY = y + headerHeight;
+
+  bodyLineGroups.forEach((lines) => {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    setTextColor(slate);
-    doc.text(
-      `${FAMILY_LABELS[row.family]}${row.mode === "emergency" ? " | Emergency Command Mode" : ` | Base ${row.base || 0}`}`,
-      left + 14,
-      y + 35
-    );
+    doc.setFontSize(9);
+    setTextColor(navy);
+    doc.text(lines, left + 14, localY);
+    localY += lines.length * 12 + 5;
+  });
 
-    const badgeText = row.mode === "emergency" ? "CMD" : String(row.subtotal);
-    const badgeWidth = row.mode === "emergency" ? 48 : 42;
-    const badgeColors =
-      row.mode === "scored" && row.noGo
-        ? { bg: redBg, text: redText }
-        : riskColors;
+  if (hardStopLines.length) {
+    const hardStopBoxHeight = hardStopLines.length * 11 + 14;
 
-    setFillColor(badgeColors.bg);
-    setDrawColor(badgeColors.bg);
-    doc.roundedRect(right - badgeWidth - 14, y + 12, badgeWidth, 24, 10, 10, "FD");
+    setFillColor(redBg);
+    setDrawColor(redBg);
+    doc.roundedRect(left + 12, localY + 2, width - 24, hardStopBoxHeight, 8, 8, "FD");
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    setTextColor(badgeColors.text);
-    doc.text(badgeText, right - badgeWidth / 2 - 14, y + 28, { align: "center" });
+    doc.setFontSize(8.5);
+    setTextColor(redText);
+    doc.text(hardStopLines, left + 18, localY + 14);
+  }
 
-    let localY = y + 52;
-
-    if (row.mode === "emergency") {
-      const prompts = row.emergencyPrompts.length
-        ? row.emergencyPrompts
-        : ["No escalation prompts currently active."];
-
-      prompts.forEach((prompt: string) => {
-        const lines = doc.splitTextToSize(`Prompt: ${prompt}`, width - 32);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        setTextColor(navy);
-        doc.text(lines, left + 14, localY);
-        localY += lines.length * 13;
-      });
-    } else {
-      const applied =
-        row.applied.length > 0
-          ? row.applied.map((item) => `${COLUMN_LABELS[item.key]} = +${item.score}`)
-          : ["No additional score modifiers active."];
-
-      applied.forEach((entry: string) => {
-        const lines = doc.splitTextToSize(entry, width - 32);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        setTextColor(navy);
-        doc.text(lines, left + 14, localY);
-        localY += lines.length * 13;
-      });
-
-      if (row.hardStopReasons.length) {
-        setFillColor(redBg);
-        setDrawColor(redBg);
-        doc.roundedRect(left + 12, localY + 4, width - 24, 22, 8, 8, "FD");
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(8.5);
-        setTextColor(redText);
-        doc.text(
-          `HARD STOP: ${row.hardStopReasons.map((item) => COLUMN_LABELS[item]).join(", ")}`,
-          left + 18,
-          localY + 18
-        );
-      }
-    }
-
-    y += cardHeight + 10;
-  };
+  y += cardHeight + 10;
+};
 
   drawHeader();
   drawRiskBanner();
