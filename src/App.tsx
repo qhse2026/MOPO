@@ -1487,7 +1487,7 @@ const drawRowCard = (row: {
       <div className="flex items-center gap-3">
         <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white p-2 ring-1 ring-white/20">
           <img
-            src="/oruc-reis-badge.png"
+            src="/oruc-reis-badge.PNG"
             alt="RV Oruç Reis"
             className="h-full w-full object-contain"
           />
